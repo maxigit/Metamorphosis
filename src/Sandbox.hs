@@ -7,13 +7,19 @@ import Language.Haskell.TH
 
 -- | Generate manually
 -- data Unique = Unique
--- genUnique = TyConI undefined
+genUnique :: Q Dec
+genUnique = do
+--   *Sandbox Sandbox> runQ [d|data A = B|]
+-- [DataD [] A_2 [] Nothing [NormalC B_3 []] []]
+  let a = mkName "A"
+  return $ DataD [] a [] Nothing [NormalC a []] [ ]
 
 
 -- same using QQ
  
 -- * Generating simple functions
-genF = [| \x -> x+1 |]
+genF :: String -> ExpQ
+genF y = [| \x -> x+ $(varE (mkName y)) |]
 
 genF' :: String -> ExpQ
 genF' y = do
