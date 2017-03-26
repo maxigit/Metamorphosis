@@ -20,6 +20,7 @@ library
       src
   build-depends:
       base >=4.8 && <5.0
+    , template-haskell
   exposed-modules:
       Sandbox
   default-language: Haskell2010

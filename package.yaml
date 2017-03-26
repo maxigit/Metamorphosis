@@ -8,5 +8,6 @@ extra-source-files:
 - ChangeLog.md
 dependencies:
 - base >=4.8 && <5.0
+- template-haskell
 library:
   source-dirs: src
