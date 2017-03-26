@@ -7,6 +7,6 @@ license: BSD3
 extra-source-files:
 - ChangeLog.md
 dependencies:
-- base >=4.8 && <4.9
+- base >=4.8 && <5.0
 library:
   source-dirs: src
