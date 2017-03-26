@@ -15,7 +15,8 @@ import Language.Haskell.TH
 -- * Generating simple functions
 genF = [| \x -> x+1 |]
 
-genF' :: ExpQ
-genF' = do
+genF' :: String -> ExpQ
+genF' y = do
+  let y' = mkName y
   let x = mkName "x"
-  return $ LamE [VarP x] (InfixE (Just $ VarE x) (VarE (mkName "+")) (Just $ LitE (IntegerL 5)))
+  return $ LamE [VarP x] (InfixE (Just $ VarE x) (VarE (mkName "+")) (Just $ VarE y'))
