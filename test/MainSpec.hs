@@ -16,13 +16,13 @@ spec :: Spec
 spec = do
   describe "Test TH" $ do
     it "copies A" $ do
-      let q = reshape Just ''A
+      let q = reshape Just ''A "AA"
       r <- runQ q    
       (show . ppr ) r `shouldBe` "data A = A0"
-    it "copies F" $ do
-      let q = reshape Just ''F
-      r <- runQ q    
-      (show . ppr ) r `shouldBe` "data F a = F0 a"
+    -- it "copies F" $ do
+    --   let q = reshape Just ''F "FF"
+    --   r <- runQ q    
+    --   (show . ppr ) r `shouldBe` "data F a = F0 a"
 
 main :: IO ()
 main = hspec spec
