@@ -15,6 +15,7 @@ genUnique = do
   return $ DataD [] a [] Nothing [NormalC a []] [ ]
 
 
+-- genU' a = [d|data A = $$(undefined) |]
 -- same using QQ
  
 -- * Generating simple functions
@@ -26,3 +27,11 @@ genF' y = do
   let y' = mkName y
   let x = mkName "x"
   return $ LamE [VarP x] (InfixE (Just $ VarE x) (VarE (mkName "+")) (Just $ VarE y'))
+
+
+showType :: Name ->  ExpQ
+showType a = do
+  info <- reify (a)
+  let str = show info
+  [| str |]
+  

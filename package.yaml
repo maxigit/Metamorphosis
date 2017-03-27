@@ -11,3 +11,15 @@ dependencies:
 - template-haskell
 library:
   source-dirs: src
+
+tests:
+  spec:
+    main : "Spec.hs"
+    source-dirs:
+      - src
+      - test
+
+    dependencies:
+      - hspec >= 2.1.8
+      - doctest
+
