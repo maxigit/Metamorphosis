@@ -190,5 +190,24 @@ printDecs name qDecs = do
   
 
 
+-- * Helper
+
 capitalize [] = []
 capitalize (c:cs) = toUpper c : cs
+
+-- ** FieldDesc Combinator
+fdName :: String -> FieldDesc -> [FieldDesc]
+fdName name fd = [fd {fdTName = name, fdCName = name }]
+
+
+
+ 
+-- * rseq
+-- R f => f R  Identity
+
+
+-- * rmap
+-- R -> (forall x . x -> a) -> [a]
+
+
+  

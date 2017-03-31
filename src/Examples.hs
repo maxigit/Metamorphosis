@@ -7,6 +7,7 @@ import Metamorphosis
 import qualified Examples.Data as D
 import Data.Char
 import Data.Maybe
+import Control.Monad
 
 
 $(metamorphosis (:[]) [''D.Unique, ''D.Record, ''D.Plain, ''D.ABC])
@@ -44,11 +45,53 @@ $(metamorphosis (\fd -> [ fd  { fdTName = "ABC'"
  )
  -- * Product to Sum type
 $(metamorphosis (\fd -> [ fd  { fdTName = "RSum'"
-                              , fdCName = "R" ++ ( fromJust $ fdFName fd)
+                              , fdCName = "RSum" ++ (capitalize . fromJust $ fdFName fd)
                               , fdFName = Nothing
                               }]
                  )
                  [''D.Record]
  )
+-- * Enum for field
+$(metamorphosis (\fd -> [ fd  { fdTName = "RField'"
+                              , fdCName = "R" ++ (capitalize . fromJust $ fdFName fd) ++ "E"
+                              , fdFName = Nothing
+                              , fdTypes = []
+                              }]
+                 )
+                 [''D.Record]
+ )
 -- * Product to many classes
+$(metamorphosis (\fd -> [ fd  { fdTName = "R" ++ (capitalize . fromJust $ fdFName fd)
+                              , fdCName = "R" ++ (capitalize . fromJust $ fdFName fd)
+                              , fdFName = Nothing
+                              } ]
+                 )
+                 [''D.Record]
+ )
 
+-- * Recordize
+$(metamorphosis (\fd -> [ fd  { fdTName = "PlainR"
+                              , fdCName = "PlainR"
+                              , fdFName = map Just ["code", "price"] !! (fdPos fd - 1)
+                              } ]
+                 )
+                 [''D.Plain]
+ )
+
+plainr = PlainR {code = "plain", price =10}
+
+
+-- -- * Merge to record
+-- should be a  setter 
+$(metamorphosis (fdName "RecordQ") [''D.Record, ''D.Quantity])
+deriving instance Show RecordQ
+recordq = RecordQ { code = "q", quantity = 10, price = 2.3}
+$(metamorphosis (fdName "RecordPLain") [''D.Record, ''D.Plain])
+
+-- * filter fields
+$(metamorphosis (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
+                              then []
+                              else [fd]
+                )
+                [''D.Record]
+ )
