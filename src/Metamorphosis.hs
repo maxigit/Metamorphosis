@@ -6,6 +6,8 @@ import Language.Haskell.TH.Syntax
 import Data.Maybe
 import Control.Monad
 import Data.Char
+import Data.List (sort, nub, group, groupBy)
+import Data.Function (on)
 
 type TName = String -- Type name
 type CName = String -- Constructor name
@@ -39,7 +41,8 @@ reshape f recName new  = do
             
       
 reshapeBang :: ((String,  [String]) -> Maybe (String, [String]) ) -> BangType -> Maybe BangType
-reshapeBang  f bang = Just bang
+reshapeBang  f (bang, typ) =
+  (\(_, b', t') -> (b', t')) `fmap` reshapeVarBang f (mkName "", bang, typ)
 
 reshapeVarBang :: ((String,  [String]) -> Maybe (String, [String]) ) -> VarBangType -> Maybe VarBangType
 reshapeVarBang  f (name, bang, typ) =
@@ -77,3 +80,90 @@ extract = error "FIX ME"
 
 
 sequence =  error "FIX ME"
+
+-- * TH
+-- ** Type
+data FieldDesc = FieldDesc
+  { fdTName :: String -- ^ Type name
+  , fdCName :: String -- ^ Constructor name
+  , fdPos :: Int -- ^ position within the constructor
+  , fdFName :: Maybe String -- ^ Field Name if Recorder
+  , fdBang :: Bang
+  , fdTypes :: [String] -- ^ [] means no field at all (ex Enum)
+
+  } deriving (Show, Eq, Ord)
+
+-- | poor man refinement type
+-- Just a way to tell that some functions want or generate sorted list
+data GroupedByType = GroupedByType String [FieldDesc]
+data GroupedByCons = GroupedByCons String [FieldDesc]
+
+-- ** Function
+-- | The workhorse of this package. Transform a set of data types to another set of data types
+-- The mapping between old fields to new is done by a mapping function.
+-- It can be used to copy a class, split it to multiple ones, split to sum type
+-- aggregate sum type to product types etc ...
+metamorphosis :: (FieldDesc -> [FieldDesc]) -> [Name] -> Q [Dec]
+metamorphosis f names = do
+  infos <- mapM reify names
+  let fields = concatMap collectFields infos
+      newFields = concatMap f fields
+  return $ map generateType (groupByType newFields)
+
+collectFields :: Info -> [FieldDesc]
+collectFields (TyConI (DataD cxt tName [vars] kind cons cxt')) = concatMap go cons where
+  go (NormalC cName bangs) =  zipWith (go' cName) bangs [1..]
+  go (RecC cName varbangs) =  zipWith (go'' cName) varbangs [1..]
+  go (InfixC bang cName bang') = [ go' cName bang 1
+                                 , go' cName bang' 2
+                                 ]
+
+  go' cName (bang, typ) pos = FieldDesc { fdTName = nameBase tName
+                                    , fdCName = nameBase cName
+                                    , fdFName = Nothing
+                                    , fdPos  = pos
+                                    , fdBang = bang
+                                    , fdTypes = typeToChain typ
+                                    }
+  go'' cName (fName, bang, typ) pos = (go' cName (bang, typ) pos) {fdFName = Just (nameBase fName)}
+collectFields info = error $ "collectFields only works with type declaration." ++ show ( ppr info )
+
+generateType :: GroupedByType -> Dec
+generateType group@(GroupedByType tName fields) = let
+  cons = groupByCons group
+  vars = nub $ sort (concatMap getVars fields) 
+  in DataD [] (mkName tName) vars Nothing (map generateCons cons) []
+
+generateCons :: GroupedByCons -> Con
+generateCons (GroupedByCons cName fields) = let
+  sorted = sort fields -- sort by position
+  -- check all fields have a name or not
+  in case traverse toVarBangType fields of
+    Nothing -> NormalC (mkName cName) (map toBangType fields)
+    Just varbangs -> RecC (mkName cName) varbangs
+
+toBangType field = (fdBang field, toType field)
+toVarBangType field = case fdFName field of
+  Nothing -> Nothing
+  Just name -> Just (mkName name, fdBang field, toType field)
+
+toType field = chainToType (fdTypes field)
+
+
+-- | Extract parametric variables from a field
+getVars :: FieldDesc -> [TyVarBndr]
+getVars field = let
+  vars = filter (isVar) (fdTypes field)
+  in map (PlainTV . mkName) vars
+   
+groupByType :: [FieldDesc] -> [GroupedByType]
+groupByType fields =  let
+  sorted = sort fields
+  groups = group fields
+  in [GroupedByType (fdTName (head group)) group | group <- groups ]
+groupByCons :: GroupedByType -> [GroupedByCons]
+groupByCons  (GroupedByType _ fields)= let
+  sorted = sort fields
+  groups = groupBy ((==) `on` fdCName) fields
+  in [GroupedByCons (fdCName (head group)) group | group <- groups ]
+
