@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 import Metamorphosis
 
@@ -13,5 +14,6 @@ $(reshape (\(n, v) -> Just (n ++ "Z", v)) ''R "Rob")
 $(reshape (\(n, v) -> Just (n ++ "Int",[ "Int"])) ''R "RobInt")
 -- Add Maybe 
 $(reshape (\(n, v) -> Just (n ++ "M",  "Maybe": v)) ''R "Mob")
+$(reshape (\(n, v) -> Just (n ++ "M",  "Maybe": v)) ''F "MB")
 -- Remove type constructors
 $(reshape (\(n, v) -> Just (n ++ "U",  [last v])) ''Mob "Uob")

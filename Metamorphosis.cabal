@@ -22,6 +22,8 @@ library
       base >=4.8 && <5.0
     , template-haskell
   exposed-modules:
+      Examples
+      Examples.Data
       Metamorphosis
       Sandbox
   default-language: Haskell2010
@@ -38,6 +40,8 @@ test-suite spec
     , hspec >= 2.1.8
     , doctest
   other-modules:
+      Examples
+      Examples.Data
       Metamorphosis
       Sandbox
       MainSpec

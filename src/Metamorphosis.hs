@@ -51,7 +51,7 @@ reshapeVarBang  f (name, bang, typ) =
           Nothing -> Nothing
           Just (new, types) -> Just ( mkName new
                                     , bang
-                                    , chainToType types
+                                    , fromJust $ chainToType types
                                     )
      
 
@@ -62,13 +62,13 @@ typeToChain (SigT t _ ) = typeToChain t
 typeToChain (VarT n) = [nameBase n]
 typeToChain (ConT t) = [nameBase t]
 typeToChain (PromotedT t) = [nameBase t]
-typeToChain t = error $ "typeToChain not implemented for :" ++ show t
+typeToChain info = error $ "typeToChain not implemented for :" ++ show info
              
-chainToType :: [String] -> Type
-chainToType [] = error "shouldn't not happen"
-chainToType [t] | isVar t = VarT (mkName t)
-                | otherwise = ConT (mkName t)
-chainToType (t:ts) =  AppT (chainToType [t]) (chainToType ts)
+chainToType :: [String] -> Maybe Type
+chainToType [] = Nothing
+chainToType [t] | isVar t = Just $ VarT (mkName t)
+                | otherwise = Just $ ConT (mkName t)
+chainToType (t:ts) =  liftM2 AppT (chainToType [t]) (chainToType ts)
   
 
 isVar [] = False
@@ -111,7 +111,15 @@ metamorphosis f names = do
   return $ map generateType (groupByType newFields)
 
 collectFields :: Info -> [FieldDesc]
-collectFields (TyConI (DataD cxt tName [vars] kind cons cxt')) = concatMap go cons where
+collectFields (TyConI (DataD cxt tName vars kind cons cxt')) = concatMap go cons where
+  go (NormalC cName []) =  [ FieldDesc { fdTName = nameBase tName
+                                     , fdCName = nameBase cName
+                                     , fdFName = Nothing
+                                     , fdPos = 0
+                                     , fdBang = (Bang NoSourceUnpackedness NoSourceStrictness)
+                                     , fdTypes = []
+                                     }
+                           ]
   go (NormalC cName bangs) =  zipWith (go' cName) bangs [1..]
   go (RecC cName varbangs) =  zipWith (go'' cName) varbangs [1..]
   go (InfixC bang cName bang') = [ go' cName bang 1
@@ -125,6 +133,7 @@ collectFields (TyConI (DataD cxt tName [vars] kind cons cxt')) = concatMap go co
                                     , fdBang = bang
                                     , fdTypes = typeToChain typ
                                     }
+
   go'' cName (fName, bang, typ) pos = (go' cName (bang, typ) pos) {fdFName = Just (nameBase fName)}
 collectFields info = error $ "collectFields only works with type declaration." ++ show ( ppr info )
 
@@ -139,16 +148,19 @@ generateCons (GroupedByCons cName fields) = let
   sorted = sort fields -- sort by position
   -- check all fields have a name or not
   in case traverse toVarBangType fields of
-    Nothing -> NormalC (mkName cName) (map toBangType fields)
-    Just varbangs -> RecC (mkName cName) varbangs
+    Nothing -> NormalC (mkName cName) (mapMaybe toBangType fields)
+    Just [] -> NormalC (mkName cName) []
+    Just varbangs -> RecC (mkName cName) (varbangs)
 
-toBangType field = (fdBang field, toType field)
+toBangType :: FieldDesc -> Maybe BangType
+toBangType field = fmap (\t -> (fdBang field, t)) (toType field)
+toVarBangType :: FieldDesc -> Maybe VarBangType
 toVarBangType field = case fdFName field of
   Nothing -> Nothing
-  Just name -> Just (mkName name, fdBang field, toType field)
+  Just name -> fmap (\t -> (mkName name, fdBang field, t)) (toType field)
 
+toType :: FieldDesc -> Maybe Type
 toType field = chainToType (fdTypes field)
-
 
 -- | Extract parametric variables from a field
 getVars :: FieldDesc -> [TyVarBndr]
@@ -159,11 +171,20 @@ getVars field = let
 groupByType :: [FieldDesc] -> [GroupedByType]
 groupByType fields =  let
   sorted = sort fields
-  groups = group fields
+  groups = groupBy ((==) `on` fdTName) fields
   in [GroupedByType (fdTName (head group)) group | group <- groups ]
 groupByCons :: GroupedByType -> [GroupedByCons]
 groupByCons  (GroupedByType _ fields)= let
   sorted = sort fields
   groups = groupBy ((==) `on` fdCName) fields
   in [GroupedByCons (fdCName (head group)) group | group <- groups ]
+
+
+printDecs :: String ->  Q [Dec] ->  Q [Dec]
+printDecs name qDecs = do
+  decs <- qDecs
+  let str = show decs
+  sq <- [|str|]
+  return [ ValD (VarP (mkName name)) (NormalB sq) []]
+  
 
