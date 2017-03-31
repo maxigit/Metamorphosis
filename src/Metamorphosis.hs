@@ -146,10 +146,11 @@ generateType group@(GroupedByType tName fields) = let
 generateCons :: GroupedByCons -> Con
 generateCons (GroupedByCons cName fields) = let
   sorted = sort fields -- sort by position
+  cname = mkName (capitalize cName)
   -- check all fields have a name or not
   in case traverse toVarBangType fields of
-    Nothing -> NormalC (mkName cName) (mapMaybe toBangType fields)
-    Just [] -> NormalC (mkName cName) []
+    Nothing -> NormalC cname (mapMaybe toBangType fields)
+    Just [] -> NormalC cname []
     Just varbangs -> RecC (mkName cName) (varbangs)
 
 toBangType :: FieldDesc -> Maybe BangType
@@ -188,3 +189,6 @@ printDecs name qDecs = do
   return [ ValD (VarP (mkName name)) (NormalB sq) []]
   
 
+
+capitalize [] = []
+capitalize (c:cs) = toUpper c : cs

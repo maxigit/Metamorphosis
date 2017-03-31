@@ -6,6 +6,7 @@ module Examples where
 import Metamorphosis
 import qualified Examples.Data as D
 import Data.Char
+import Data.Maybe
 
 
 $(metamorphosis (:[]) [''D.Unique, ''D.Record, ''D.Plain, ''D.ABC])
@@ -32,7 +33,7 @@ $(metamorphosis (\fd -> [fd { fdTName = fdTName fd ++ "F"
 
 recordF :: Applicative f => RecordF f
 recordF = RecordF (pure "code") (pure 4.5)
-
+-- * Flatten SUM type
 $(metamorphosis (\fd -> [ fd  { fdTName = "ABC'"
                               , fdCName = "ABC'"
                               , fdFName = Just (map toLower $ fdCName fd)
@@ -41,3 +42,13 @@ $(metamorphosis (\fd -> [ fd  { fdTName = "ABC'"
                  )
                  [''D.ABC]
  )
+ -- * Product to Sum type
+$(metamorphosis (\fd -> [ fd  { fdTName = "RSum'"
+                              , fdCName = "R" ++ ( fromJust $ fdFName fd)
+                              , fdFName = Nothing
+                              }]
+                 )
+                 [''D.Record]
+ )
+-- * Product to many classes
+
