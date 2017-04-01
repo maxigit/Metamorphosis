@@ -95,3 +95,13 @@ $(metamorphosis (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
                 )
                 [''D.Record]
  )
+
+$(generateExtract (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
+                              then []
+                              else [fd]
+                )
+                [''D.Record]
+                [''RecordSmall]
+                "extractSmal"
+ )
+                

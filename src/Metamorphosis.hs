@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE QuasiQuotes, TemplateHaskell #-}
 module Metamorphosis where
 
@@ -8,6 +9,7 @@ import Control.Monad
 import Data.Char
 import Data.List (sort, nub, group, groupBy)
 import Data.Function (on)
+import Debug.Trace
 
 type TName = String -- Type name
 type CName = String -- Constructor name
@@ -73,11 +75,6 @@ chainToType (t:ts) =  liftM2 AppT (chainToType [t]) (chainToType ts)
 
 isVar [] = False
 isVar (c:cs) = isLower c
-
-inject = error "FIX ME"
-
-extract = error "FIX ME"
-
 
 sequence =  error "FIX ME"
 
@@ -200,7 +197,86 @@ fdName :: String -> FieldDesc -> [FieldDesc]
 fdName name fd = [fd {fdTName = name, fdCName = name }]
 
 
+-- * convert
+-- | a contains e. We can extract an e from a a and therefore reinject it.
+class Has a e where
+  extract :: a -> e
+  inject :: a -> e -> a
 
+  -- law -- extract = id
+  -- inject a . extract = id
+
+-- | Generates an extract function from a set of types to a set of types
+-- example XYZ -> (XY, Z)
+-- will generate extract (X x y z) = (XY x y, Z z)
+generateExtract :: (FieldDesc -> [FieldDesc]) -> [Name] -> [Name] -> String ->  DecsQ
+generateExtract f as bs fname = do
+  aInfos <- mapM reify as
+  bInfos <- mapM reify as
+  
+  let aFields = concatMap collectFields aInfos
+      bFields = concatMap collectFields bInfos
+      bnames = map nameBase bs
+
+  -- we need to generate all constructors combinations on the input side
+      clauses = buildExtractClauses f aFields bnames
+  return [ FunD (mkName fname) clauses ]
+
+buildExtractClauses :: (FieldDesc -> [FieldDesc]) -> [FieldDesc] -> [String] -> [Clause]
+buildExtractClauses f fields targets = let
+  -- | Transform a field and check if matches the required targets
+  trans :: FieldDesc -> Maybe [FieldDesc]
+  trans field = let newFields = f field
+                in if all ((`elem` targets) . fdTName) newFields
+                      then Just newFields
+                      else Nothing
+  groups = groupByType fields
+  -- generates all constructor combinations
+  go :: [GroupedByCons] -> [GroupedByType] -> [Clause]
+  go [] [] = error $ "Can't generate extract function for " ++ show fields
+  go typeCons [] = maybeToList $ buildExtractClause f targets typeCons
+  go typeCons (group:groups) = do -- []
+    cons <- groupByCons group
+    go (cons:typeCons) groups 
+  in go [] groups 
+
+buildExtractClause :: (FieldDesc -> [FieldDesc]) -> [String] -> [GroupedByCons] -> Maybe Clause
+buildExtractClause f names groups =  let
+  pats = [ConP (mkName cname) (fieldPats fields)  | (GroupedByCons cname fields) <- groups]
+  fieldPats fields = map fieldPat fields
+  fieldPat field = case f field of
+    [] -> WildP
+    _ -> VarP (fdPatName field)
+
+  body = AppE (VarE (mkName "error")) (LitE (StringL "not implemented"))
+  in traceShowId $ Just $ Clause (map ParensP pats) (NormalB body) []
+
+fdPatName :: FieldDesc -> Name
+fdPatName field = mkName $ fromMaybe ("v" ++ show (fdPos field)) (fdFName field)
+
+ -- pat = patTuble 
+  -- A x
+  -- A y
+  -- A s -- not used
+  -- B z
+  -- B Nothing
+
+  -- A x, B z -> AB (Just x) Nothing (Just z)
+  -- A x, B Nothing -> AB (Just x) Nothing Nothing
+  -- A s , ... -> not used
+  -- A y, B z -> AB Nothing (Just y) (Just z)
+  -- A y, B Nothing -> AB Nothing (Just y) Nothing
+  
+  
+
+  
+  
+-- | like inject but whereas inject is losless, tranfer isn't.
+-- There is no way to extract the inject result.
+
+class Transfer a e where
+  transfer :: a -> e -> a
+  recover :: a -> Maybe e
  
 -- * rseq
 -- R f => f R  Identity
