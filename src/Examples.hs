@@ -95,6 +95,7 @@ $(metamorphosis (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
                 )
                 [''D.Record]
  )
+-- deriving instance Show RecordSmall
 
 $(generateExtract (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
                               then []
@@ -102,6 +103,7 @@ $(generateExtract (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
                 )
                 [''D.Record]
                 [''RecordSmall]
-                "extractSmal"
+                "extractSmall"
  )
+rsmall = extractSmall record
                 

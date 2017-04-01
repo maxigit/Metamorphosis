@@ -9,6 +9,8 @@ import Control.Monad
 import Data.Char
 import Data.List (sort, nub, group, groupBy)
 import Data.Function (on)
+import qualified Data.Map as Map
+import Data.Map (Map)
 import Debug.Trace
 
 type TName = String -- Type name
@@ -212,18 +214,19 @@ class Has a e where
 generateExtract :: (FieldDesc -> [FieldDesc]) -> [Name] -> [Name] -> String ->  DecsQ
 generateExtract f as bs fname = do
   aInfos <- mapM reify as
-  bInfos <- mapM reify as
+  bInfos <- mapM reify bs
   
   let aFields = concatMap collectFields aInfos
       bFields = concatMap collectFields bInfos
       bnames = map nameBase bs
 
   -- we need to generate all constructors combinations on the input side
-      clauses = buildExtractClauses f aFields bnames
+      clauses = buildExtractClauses f aFields bnames bFields
+  traceShowM ("bFields", bFields)
   return [ FunD (mkName fname) clauses ]
 
-buildExtractClauses :: (FieldDesc -> [FieldDesc]) -> [FieldDesc] -> [String] -> [Clause]
-buildExtractClauses f fields targets = let
+buildExtractClauses :: (FieldDesc -> [FieldDesc]) -> [FieldDesc] -> [String] -> [FieldDesc] -> [Clause]
+buildExtractClauses f fields targets bfields = let
   -- | Transform a field and check if matches the required targets
   trans :: FieldDesc -> Maybe [FieldDesc]
   trans field = let newFields = f field
@@ -234,26 +237,35 @@ buildExtractClauses f fields targets = let
   -- generates all constructor combinations
   go :: [GroupedByCons] -> [GroupedByType] -> [Clause]
   go [] [] = error $ "Can't generate extract function for " ++ show fields
-  go typeCons [] = maybeToList $ buildExtractClause f targets typeCons
+  go typeCons [] = maybeToList $ buildExtractClause f targets typeCons (groupByType bfields)
   go typeCons (group:groups) = do -- []
     cons <- groupByCons group
     go (cons:typeCons) groups 
   in go [] groups 
 
-buildExtractClause :: (FieldDesc -> [FieldDesc]) -> [String] -> [GroupedByCons] -> Maybe Clause
-buildExtractClause f names groups =  let
+buildExtractClause :: (FieldDesc -> [FieldDesc]) -> [String] -> [GroupedByCons] -> [GroupedByType] -> Maybe Clause
+buildExtractClause f names groups btypes =  let
   pats = [ConP (mkName cname) (fieldPats fields)  | (GroupedByCons cname fields) <- groups]
   fieldPats fields = map fieldPat fields
   fieldPat field = case f field of
     [] -> WildP
     _ -> VarP (fdPatName field)
 
-  body = AppE (VarE (mkName "error")) (LitE (StringL "not implemented"))
+  fields = concat [ fields | (GroupedByCons _ fields) <- groups ]
+  fieldAssoc = Map.fromList [(fdPos new, fdPatName field) | field <- fields , new <- f field ]
+  body = TupE (map (consBody fieldAssoc) btypes)
   in traceShowId $ Just $ Clause (map ParensP pats) (NormalB body) []
 
 fdPatName :: FieldDesc -> Name
 fdPatName field = mkName $ fromMaybe ("v" ++ show (fdPos field)) (fdFName field)
 
+consBody :: Map Int Name -> GroupedByType -> Exp
+consBody varMap (GroupedByType typ fields) = let
+  vars = map findVar fields 
+  findVar fd = case Map.lookup (fdPos fd) varMap of
+    Nothing -> error $ "can't extract field " ++ show fd
+    Just vname -> VarE vname
+  in traceShow (varMap, fields) $ foldl AppE (ConE (mkName typ)) vars
  -- pat = patTuble 
   -- A x
   -- A y
