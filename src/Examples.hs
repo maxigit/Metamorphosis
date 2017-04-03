@@ -5,6 +5,7 @@ module Examples where
 
 import Metamorphosis
 import qualified Examples.Data as D
+import qualified Examples.Data as Examples.Data
 import Data.Char
 import Data.Maybe
 import Control.Monad
@@ -83,9 +84,21 @@ plainr = PlainR {code = "plain", price =10}
 
 -- -- * Merge to record
 -- should be a  setter 
-$(metamorphosis (fdName "RecordQ") [''D.Record, ''D.Quantity])
+$(metamorphosis (fdName "RecordQ" . (\fd -> fd {fdFName = fmap (++"Q") (fdFName fd )})) [''D.Record, ''D.Quantity])
+$(generateExtract (\fd -> let typ = if fdFName fd == (Just "quantityQ")
+                                        then "Quantity"
+                                        else "Record"
+                          in [ fd { fdMName = Just "D"
+                                  , fdTName =  typ
+                                  , fdCName = typ
+                                  , fdFName = fmap init (fdFName fd)
+                                  }
+                             ] )
+                  [''RecordQ]
+                  [''D.Record, ''D.Quantity]
+                  "extractQ")
 deriving instance Show RecordQ
-recordq = RecordQ { code = "q", quantity = 10, price = 2.3}
+recordq = RecordQ { codeQ = "q", quantityQ = 10, priceQ = 2.3}
 $(metamorphosis (fdName "RecordPLain") [''D.Record, ''D.Plain])
 
 -- * filter fields

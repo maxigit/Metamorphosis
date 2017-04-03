@@ -89,13 +89,14 @@ data FieldDesc = FieldDesc
   , fdFName :: Maybe String -- ^ Field Name if Recorder
   , fdBang :: Bang
   , fdTypes :: [String] -- ^ [] means no field at all (ex Enum)
+  , fdMName :: Maybe String -- ^ Module name . only used to use proper constructor name
 
   } deriving (Show, Eq, Ord)
 
 -- | poor man refinement type
 -- Just a way to tell that some functions want or generate sorted list
-data GroupedByType = GroupedByType String [FieldDesc]
-data GroupedByCons = GroupedByCons String [FieldDesc]
+data GroupedByType = GroupedByType (Maybe String) String [FieldDesc]
+data GroupedByCons = GroupedByCons (Maybe String) String [FieldDesc]
 
 -- ** Function
 -- | The workhorse of this package. Transform a set of data types to another set of data types
@@ -117,6 +118,7 @@ collectFields (TyConI (DataD cxt tName vars kind cons cxt')) = concatMap go cons
                                      , fdPos = 0
                                      , fdBang = (Bang NoSourceUnpackedness NoSourceStrictness)
                                      , fdTypes = []
+                                     , fdMName = nameModule tName
                                      }
                            ]
   go (NormalC cName bangs) =  zipWith (go' cName) bangs [1..]
@@ -131,19 +133,20 @@ collectFields (TyConI (DataD cxt tName vars kind cons cxt')) = concatMap go cons
                                     , fdPos  = pos
                                     , fdBang = bang
                                     , fdTypes = typeToChain typ
+                                    , fdMName = nameModule tName
                                     }
 
   go'' cName (fName, bang, typ) pos = (go' cName (bang, typ) pos) {fdFName = Just (nameBase fName)}
 collectFields info = error $ "collectFields only works with type declaration." ++ show ( ppr info )
 
 generateType :: GroupedByType -> Dec
-generateType group@(GroupedByType tName fields) = let
+generateType group@(GroupedByType mName tName fields) = let
   cons = groupByCons group
   vars = nub $ sort (concatMap getVars fields) 
   in DataD [] (mkName tName) vars Nothing (map generateCons cons) []
 
 generateCons :: GroupedByCons -> Con
-generateCons (GroupedByCons cName fields) = let
+generateCons (GroupedByCons mName cName fields) = let
   sorted = sort fields -- sort by position
   cname = mkName (capitalize cName)
   -- check all fields have a name or not
@@ -172,12 +175,12 @@ groupByType :: [FieldDesc] -> [GroupedByType]
 groupByType fields =  let
   sorted = sort fields
   groups = groupBy ((==) `on` fdTName) fields
-  in [GroupedByType (fdTName (head group)) group | group <- groups ]
+  in [GroupedByType (fdMName master) (fdTName master) group | group <- groups, let master = head group ]
 groupByCons :: GroupedByType -> [GroupedByCons]
-groupByCons  (GroupedByType _ fields)= let
+groupByCons  (GroupedByType _ _ fields)= let
   sorted = sort fields
   groups = groupBy ((==) `on` fdCName) fields
-  in [GroupedByCons (fdCName (head group)) group | group <- groups ]
+  in [GroupedByCons (fdMName master) (fdCName master) group | group <- groups, let master = head group ]
 
 
 printDecs :: String ->  Q [Dec] ->  Q [Dec]
@@ -245,27 +248,38 @@ buildExtractClauses f fields targets bfields = let
 
 buildExtractClause :: (FieldDesc -> [FieldDesc]) -> [String] -> [GroupedByCons] -> [GroupedByType] -> Maybe Clause
 buildExtractClause f names groups btypes =  let
-  pats = [ConP (mkName cname) (fieldPats fields)  | (GroupedByCons cname fields) <- groups]
+  pats = [ConP (mkName cname) (fieldPats fields)  | (GroupedByCons mname cname fields) <- groups]
   fieldPats fields = map fieldPat fields
   fieldPat field = case f field of
     [] -> WildP
     _ -> VarP (fdPatName field)
 
-  fields = concat [ fields | (GroupedByCons _ fields) <- groups ]
-  fieldAssoc = Map.fromList [(fdPos new, fdPatName field) | field <- fields , new <- f field ]
+  fields = concat [ fields | (GroupedByCons _ _ fields) <- groups ]
+  newFields = recomputeFDPositions (concatMap f fields)
+  fieldAssoc = Map.fromList [traceShow ("field", field, "new", new) ((fdCName new, fdPos new), fdPatName field) | (field, new) <- zip fields newFields ]
   body = TupE (map (consBody fieldAssoc) btypes)
-  in traceShowId $ Just $ Clause (map ParensP pats) (NormalB body) []
+  -- in traceShowId $ Just $ Clause (map ParensP pats) (NormalB body) []
+  result = Clause (map ParensP pats) (NormalB body) []
+  in traceShow ("fields", fields) $ traceShow ("result", show $ ppr result) (Just result)
+
+-- | Recalculates the position of a field relative to its constructor
+-- exapmle [2,5,10] -> [1,2,3]
+recomputeFDPositions :: [FieldDesc] -> [FieldDesc]
+recomputeFDPositions fields = let
+  groups = map (map go . groupByCons) (groupByType fields)
+  go group@(GroupedByCons _ _ fields) = zipWith (\fd i -> fd { fdPos = i }) fields [1..]
+  in concatMap (concat) groups
 
 fdPatName :: FieldDesc -> Name
 fdPatName field = mkName $ fromMaybe ("v" ++ show (fdPos field)) (fdFName field)
 
-consBody :: Map Int Name -> GroupedByType -> Exp
-consBody varMap (GroupedByType typ fields) = let
+consBody :: Map (String, Int) Name -> GroupedByType -> Exp
+consBody varMap (GroupedByType mname typ fields) = let
   vars = map findVar fields 
-  findVar fd = case Map.lookup (fdPos fd) varMap of
+  findVar fd = case Map.lookup ((fdCName fd, fdPos fd)) varMap of
     Nothing -> error $ "can't extract field " ++ show fd
     Just vname -> VarE vname
-  in traceShow (varMap, fields) $ foldl AppE (ConE (mkName typ)) vars
+  in traceShow (varMap, fields) $ foldl AppE (ConE (mkName $ maybe "" (++ "." ) mname ++ typ)) vars
  -- pat = patTuble 
   -- A x
   -- A y
