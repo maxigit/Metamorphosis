@@ -1,7 +1,10 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Examples where
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+module Main where
 
 import Metamorphosis
 import qualified Examples.Data as D
@@ -9,7 +12,8 @@ import qualified Examples.Data as Examples.Data
 import Data.Char
 import Data.Maybe
 import Control.Monad
-
+import Data.Functor.Identity
+  
 
 $(metamorphosis (:[]) [''D.Unique, ''D.Record, ''D.Plain, ''D.ABC])
 
@@ -31,6 +35,20 @@ $(metamorphosis (\fd -> [fd { fdTName = fdTName fd ++ "F"
                             , fdCName = fdCName fd ++ "F"
                             , fdTypes = "f" : fdTypes fd
                             }]) [''D.Record])
+$(generateExtract (\fd -> [fd { fdTName = fdTName fd ++ "F"
+                            , fdCName = fdCName fd ++ "F"
+                            , fdTypes = "f" : fdTypes fd
+                            }]) [''Examples.Data.Record] [''RecordF] "extractFF")
+$(generateExtract (\fd -> [fd { fdTName = init $ fdTName fd
+                            , fdCName = init $ fdCName fd
+                            , fdTypes = drop 1 $ fdTypes fd
+                            }]) [''RecordF] [''D.Record] "extractFFF")
+
+-- instance Monad f => ExtractF Examples.Data.Record f (RecordF f) where
+--    extractF = extractFF
+
+instance Monad f => ExtractF (RecordF f) f D.Record where
+   extractF = extractFFF
 
 
 recordF :: Applicative f => RecordF f
@@ -108,7 +126,7 @@ $(metamorphosis (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
                 )
                 [''D.Record]
  )
--- deriving instance Show RecordSmall
+deriving instance Show RecordSmall
 
 $(generateExtract (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
                               then []
@@ -118,5 +136,8 @@ $(generateExtract (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
                 [''RecordSmall]
                 "extractSmall"
  )
-rsmall = extractSmall record
+rsmall = runIdentity $ extractSmall record
                 
+
+main :: IO ()
+main = putStrLn "Everything is Ok"

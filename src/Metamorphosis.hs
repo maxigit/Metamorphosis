@@ -1,17 +1,18 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 {-# LANGUAGE QuasiQuotes, TemplateHaskell #-}
 module Metamorphosis where
 
-import Language.Haskell.TH
-import Language.Haskell.TH.Syntax
-import Data.Maybe
-import Control.Monad
-import Data.Char
-import Data.List (sort, nub, group, groupBy)
-import Data.Function (on)
+import           Control.Monad
+import           Data.Char
+import           Data.Function (on)
+import           Data.List (sort, nub, group, groupBy)
+import           Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Map (Map)
-import Debug.Trace
+import           Data.Maybe
+import           Debug.Trace
+import           Language.Haskell.TH
+import           Language.Haskell.TH.Syntax
 
 type TName = String -- Type name
 type CName = String -- Constructor name
@@ -225,7 +226,6 @@ generateExtract f as bs fname = do
 
   -- we need to generate all constructors combinations on the input side
       clauses = buildExtractClauses f aFields bnames bFields
-  traceShowM ("bFields", bFields)
   return [ FunD (mkName fname) clauses ]
 
 buildExtractClauses :: (FieldDesc -> [FieldDesc]) -> [FieldDesc] -> [String] -> [FieldDesc] -> [Clause]
@@ -256,11 +256,11 @@ buildExtractClause f names groups btypes =  let
 
   fields = concat [ fields | (GroupedByCons _ _ fields) <- groups ]
   newFields = recomputeFDPositions (concatMap f fields)
-  fieldAssoc = Map.fromList [traceShow ("field", field, "new", new) ((fdCName new, fdPos new), fdPatName field) | (field, new) <- zip fields newFields ]
+  fieldAssoc = Map.fromList [ ((fdCName new, fdPos new), fdPatName field) | (field, new) <- zip fields newFields ]
   body = TupE (map (consBody fieldAssoc) btypes)
   -- in traceShowId $ Just $ Clause (map ParensP pats) (NormalB body) []
   result = Clause (map ParensP pats) (NormalB body) []
-  in traceShow ("fields", fields) $ traceShow ("result", show $ ppr result) (Just result)
+  in (Just result)
 
 -- | Recalculates the position of a field relative to its constructor
 -- exapmle [2,5,10] -> [1,2,3]
@@ -279,7 +279,12 @@ consBody varMap (GroupedByType mname typ fields) = let
   findVar fd = case Map.lookup ((fdCName fd, fdPos fd)) varMap of
     Nothing -> error $ "can't extract field " ++ show fd
     Just vname -> VarE vname
-  in traceShow (varMap, fields) $ foldl AppE (ConE (mkName $ maybe "" (++ "." ) mname ++ typ)) vars
+  result =  foldl (\x y -> AppE (AppE (VarE (mkName "ap")) x) y)
+           (AppE (VarE (mkName "pure"))
+                 (ConE (mkName $ maybe "" (++ "." ) mname ++ typ))
+           )
+           (map (AppE (VarE $ mkName "extractF")) vars)
+  in traceShow (ppr result) result
  -- pat = patTuble 
   -- A x
   -- A y
@@ -296,7 +301,7 @@ consBody varMap (GroupedByType mname typ fields) = let
   
 
   
-  
+ 
 -- | like inject but whereas inject is losless, tranfer isn't.
 -- There is no way to extract the inject result.
 
@@ -304,7 +309,19 @@ class Transfer a e where
   transfer :: a -> e -> a
   recover :: a -> Maybe e
  
+class ExtractF a f b where
+  extractF ::a -> f b
+
+instance Applicative f => ExtractF a f a where
+  extractF  = pure
+instance Applicative f => ExtractF (f a) f a where
+  extractF  = id
+instance (Applicative f, ExtractF a f a', ExtractF b f b') => ExtractF (a, b) f (a',b') where
+  extractF (a,b) = (,) <$> extractF a <*> extractF b
+instance (Applicative f, ExtractF a f a', ExtractF b f b', ExtractF c f c') => ExtractF (a, b, c) f (a',b', c') where
+  extractF (a,b,c) = (,,) <$> extractF a <*> extractF b <*> extractF c
 -- * rseq
+ 
 -- R f => f R  Identity
 
 

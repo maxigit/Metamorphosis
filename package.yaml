@@ -24,3 +24,10 @@ tests:
       - hspec >= 2.1.8
       - doctest
 
+executables:
+  examples:
+    main: "Examples.hs"
+    source-dirs: examples
+    dependencies:
+    - lens
+    - Metamorphosis
