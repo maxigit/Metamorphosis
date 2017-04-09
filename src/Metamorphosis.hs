@@ -13,6 +13,7 @@ import           Data.Maybe
 import           Debug.Trace
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import Data.Functor.Identity
 import Lens.Micro.TH
 
 type TName = String -- Type name
@@ -160,6 +161,9 @@ printDecs name qDecs = do
 capitalize [] = []
 capitalize (c:cs) = toUpper c : cs
 
+uncapitalize [] = []
+uncapitalize (c:cs) = toLower c : cs
+
 -- ** FieldDesc Combinator
 _fdName :: String -> FieldDesc -> [FieldDesc]
 _fdName name fd = [fd {_fdTName = name, _fdCName = name }]
@@ -186,9 +190,13 @@ generateExtract f as bs fname = do
       bFields = concatMap collectFields bInfos
       bnames = map nameBase bs
 
-  -- we need to generate all constructors combinations on the input side
       clauses = buildExtractClauses f aFields bnames bFields
-  return [ FunD (mkName fname) clauses ]
+      result =  generateExtract' f aFields bnames bFields fname
+  return result
+
+generateExtract' f aFields bnames bFields fname = let
+      clauses = buildExtractClauses f aFields bnames bFields
+      in [ FunD (mkName fname) clauses ]
 
 buildExtractClauses :: (FieldDesc -> [FieldDesc]) -> [FieldDesc] -> [String] -> [FieldDesc] -> [Clause]
 buildExtractClauses f fields targets bfields = let
@@ -225,7 +233,7 @@ buildExtractClause f names groups btypes =  let
   in (Just result)
 
 -- | Recalculates the position of a field relative to its constructor
--- exapmle [2,5,10] -> [1,2,3]
+-- example [2,5,10] -> [1,2,3]
 recomputeFDPositions :: [FieldDesc] -> [FieldDesc]
 recomputeFDPositions fields = let
   groups = map (map go . groupByCons) (groupByType fields)
@@ -241,7 +249,7 @@ consBody varMap (GroupedByType mname typ fields) = let
   findVar fd = case Map.lookup ((_fdCName fd, _fdPos fd)) varMap of
     Nothing -> error $ "can't extract field " ++ show fd
     Just vname -> VarE vname
-  result =  foldl (\x y -> AppE (AppE (VarE (mkName "ap")) x) y)
+  result =  foldl (\x y -> UInfixE x (VarE $ mkName "<*>" ) y)
            (AppE (VarE (mkName "pure"))
                  (ConE (mkName $ maybe "" (++ "." ) mname ++ typ))
            )
@@ -261,6 +269,33 @@ consBody varMap (GroupedByType mname typ fields) = let
   -- A y, B Nothing -> AB Nothing (Just y) Nothing
   
   
+-- data Action = GSetter | GGetter deriving (Show, Read, Eq, Ord)
+-- the target names are string, as generated data types are not available
+-- to TH yet
+metamorphosis' :: (FieldDesc -> [FieldDesc]) -> [Name] ->[String] -> Q [Dec]
+metamorphosis' f anames bnames = do
+  typeDecs <- metamorphosis f anames
+
+  aInfos <- mapM reify anames
+  let aFields = concatMap collectFields  aInfos
+      bFields = concatMap f aFields
+
+      convertName = extractName (map nameBase anames) bnames
+      convertDecs = generateExtract' f aFields bnames bFields convertName
+
+  return (typeDecs ++ convertDecs)
+
+
+-- generate the name of the extract function
+extractName :: [String] -> [String] -> String
+extractName ins outs = aggregateNames ins ++ "To" ++ capitalize (aggregateNames outs) ++ "A"
+
+
+aggregateNames :: [String] -> String
+aggregateNames names = uncapitalize $ concatMap (capitalize) names
+
+  
+
 
   
  
@@ -278,6 +313,9 @@ instance Applicative f => ExtractF a f a where
   extractF  = pure
 instance Applicative f => ExtractF (f a) f a where
   extractF  = id
+instance Applicative f => ExtractF a Identity (f a) where
+  extractF = pure . pure
+
 instance (Applicative f, ExtractF a f a', ExtractF b f b') => ExtractF (a, b) f (a',b') where
   extractF (a,b) = (,) <$> extractF a <*> extractF b
 instance (Applicative f, ExtractF a f a', ExtractF b f b', ExtractF c f c') => ExtractF (a, b, c) f (a',b', c') where
