@@ -1,4 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 module PointSpec where
 
 import Control.Lens
@@ -9,9 +10,12 @@ data Point3 = Point3 { x :: Double, y :: Double, z :: Double } deriving (Show, R
 data PointM = PointM { x :: Double,  y :: Double, z :: Maybe Double} deriving (Show, Read, Eq)
 
 point2 :: Prism' PointM Point2
-point2 = undefined
+point2 = prism (\(Point2 x y) -> PointM x y Nothing)
+               (\p@(PointM x y zm) -> maybe (Right (Point2 x y)) (\_ -> Left p) zm)
 point3 :: Prism' PointM Point3
-point3 = undefined
+-- point3 :: (Point3 -> f Point3) -> PointM -> f PointM
+point3 = prism (\(Point3 x y z) -> PointM x y (Just z))
+               (\p@(PointM x y zm) -> maybe (Left p) (Right . Point3 x y ) zm)
 
 pm2 = PointM 1 2 Nothing
 pm3 = PointM 1 2 (Just 3)
