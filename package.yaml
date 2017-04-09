@@ -23,6 +23,7 @@ tests:
     dependencies:
       - hspec >= 2.1.8
       - doctest
+      - lens
 
 executables:
   examples:

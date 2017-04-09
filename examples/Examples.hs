@@ -12,6 +12,7 @@ import qualified Examples.Data as Examples.Data
 import Data.Char
 import Data.Maybe
 import Control.Monad
+import Control.Lens
 import Data.Functor.Identity
   
 
@@ -118,7 +119,6 @@ $(generateExtract (\fd -> let typ = if fdFName fd == (Just "quantityQ")
 deriving instance Show RecordQ
 recordq = RecordQ { codeQ = "q", quantityQ = 10, priceQ = 2.3}
 $(metamorphosis (fdName "RecordPLain") [''D.Record, ''D.Plain])
-
 -- * filter fields
 $(metamorphosis (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
                               then []
@@ -141,3 +141,55 @@ rsmall = runIdentity $ extractSmall record
 
 main :: IO ()
 main = putStrLn "Everything is Ok"
+
+
+-- * Trying to implement lens manually
+-- ** RecordQ -> (Record, Quantity)
+-- lens
+recordL :: Functor f => (Record -> f Record) -> RecordQ -> f RecordQ
+recordL f rq@(RecordQ code price quantity) = let
+  recordF = f (Record code price) 
+  injectR (Record code' price') = RecordQ code' price' quantity
+  in fmap injectR  recordF
+
+-- lens
+quantityL :: Functor f => (D.Quantity -> f D.Quantity) -> RecordQ -> f RecordQ
+quantityL f rq@(RecordQ code price quantity) = let
+  quantityF = f (D.Quantity quantity)
+  injectR (D.Quantity quantity') = RecordQ code price quantity'
+  in fmap injectR  quantityF
+  
+
+-- **  (Record, Quantity) -> RecordQ
+-- ** (Record, Quantity) <-> RecordQ
+rqL :: Functor f => ((Record , D.Quantity) -> f (Record, D.Quantity)) -> RecordQ -> f RecordQ
+rqL f rq@(RecordQ code price quantity) = let
+  r'q = f (Record code price, D.Quantity quantity)
+  injectR (Record code' price', D.Quantity quantity') = RecordQ code' price' quantity'
+  in fmap injectR  r'q
+
+-- dimap (a -> b) -> (c -> d) -> p b c     -> p a d
+-- Iso ::                        p a (f b) -> p s (f t)
+--  a -> s
+--  b -> a
+--  c -> f b
+-- d -> f t
+-- dimap :: (s -> a) -> (f b -> f t)
+  -- s = t =  RecordQ
+  -- a = b = (R, Q)
+
+-- could be written using : iso r'qTorq rqTor'q. No need for lenses there.
+rqI :: Iso' RecordQ (Record, D.Quantity)
+rqI p = dimap sToa fbToft p where
+  sToa (RecordQ code price quantity) = (Record code price, D.Quantity quantity)
+  fbToft = fmap  bTot
+  bTot (Record code price, D.Quantity quantity) = RecordQ code price quantity
+
+-- in term of previous lenses
+
+-- RecordF
+-- recF :: (Applicative f, Functor f, Functor g) => (Record -> f Record) -> RecordF g -> f (RecordF g)
+recF f (RecordF codeF priceF) = let
+  rf = Record <$> codeF <*> priceF
+  rf' = traverse f rf
+  in undefined -- fmap (\(Record code price) -> Record code price) rf'

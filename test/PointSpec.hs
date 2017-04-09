@@ -10,12 +10,17 @@ data Point3 = Point3 { x :: Double, y :: Double, z :: Double } deriving (Show, R
 data PointM = PointM { x :: Double,  y :: Double, z :: Maybe Double} deriving (Show, Read, Eq)
 
 point2 :: Prism' PointM Point2
-point2 = prism (\(Point2 x y) -> PointM x y Nothing)
-               (\p@(PointM x y zm) -> maybe (Right (Point2 x y)) (\_ -> Left p) zm)
+-- point2 = prism (\(Point2 x y) -> PointM x y Nothing)
+--                (\p@(PointM x y zm) -> maybe (Right (Point2 x y)) (\_ -> Left p) zm)
+point2 = prism' (\(Point2 x y) -> PointM x y Nothing)
+               (\p@(PointM x y zm) -> maybe (Just (Point2 x y)) (const Nothing) zm)
 point3 :: Prism' PointM Point3
 -- point3 :: (Point3 -> f Point3) -> PointM -> f PointM
 point3 = prism (\(Point3 x y z) -> PointM x y (Just z))
                (\p@(PointM x y zm) -> maybe (Left p) (Right . Point3 x y ) zm)
+
+pointM3 :: Lens PointM Point3 (Maybe Double) Double
+pointM3 f (PointM x y mz) = (Point3 x y) `fmap` f mz
 
 pm2 = PointM 1 2 Nothing
 pm3 = PointM 1 2 (Just 3)
@@ -38,6 +43,8 @@ spec = do
   describe "PointM to Point2"$ do
     it "extract if possible" $ do
         pm2 ^?! point2 `shouldBe` p2
+    it "doesn't extract if not" $ do
+        pm2 ^? point3 `shouldBe` Nothing
   describe "Point3 to PointM" $ do
     it "get pointM" $ do
       p3 ^. re point3 `shouldBe` pm3
