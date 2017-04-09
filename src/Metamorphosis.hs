@@ -13,52 +13,12 @@ import           Data.Maybe
 import           Debug.Trace
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
+import Lens.Micro.TH
 
 type TName = String -- Type name
 type CName = String -- Constructor name
 type FName = String -- field name
--- | map
 
-reshape :: ((String,  [String]) -> Maybe (String, [String]) ) -> Name -> String -> Q [Dec]
-reshape f recName new  = do
-  recInfo <- reify recName
-  return [ go recInfo ]
-  
-  where go (TyConI (DataD context name vars kind constructors derivings )) =
-           (DataD context newName vars kind (map renameCons constructors) derivings )
-        newName = mkName new
-
-        reshapeBangs = mapMaybe (reshapeBang f)
-        reshapeVarBangs = mapMaybe (reshapeVarBang f)
-
-        renameCons (NormalC name bangs) = NormalC (rename name) (reshapeBangs bangs)
-        renameCons (RecC name bangs) = RecC (rename name) (reshapeVarBangs bangs)
-        -- renameCons (InfixC bang name bang') = InfixC  (reshapeBang bang) (rename name) (reshapeBang bang')
-        renameCons (ForallC vars ctx con) = ForallC vars ctx (renameCons con)
-        rendameCons (GadtC names vars typ) = GadtC (map rename names) vars typ
-        rendameCons (RecGadtC names vars typ) = RecGadtC (map rename names) vars typ
-
-        rename name =
-          let base = nameBase name
-          in mkName $ case f (base, []) of
-                          Nothing -> base ++ "'"
-                          Just (new, _) -> new
-            
-      
-reshapeBang :: ((String,  [String]) -> Maybe (String, [String]) ) -> BangType -> Maybe BangType
-reshapeBang  f (bang, typ) =
-  (\(_, b', t') -> (b', t')) `fmap` reshapeVarBang f (mkName "", bang, typ)
-
-reshapeVarBang :: ((String,  [String]) -> Maybe (String, [String]) ) -> VarBangType -> Maybe VarBangType
-reshapeVarBang  f (name, bang, typ) =
-  let base = nameBase name
-  in case f (base, typeToChain typ) of
-          Nothing -> Nothing
-          Just (new, types) -> Just ( mkName new
-                                    , bang
-                                    , fromJust $ chainToType types
-                                    )
-     
 
 typeToChain :: Type -> [String]
 typeToChain (ForallT _ _ typ ) = typeToChain typ
@@ -84,15 +44,17 @@ sequence =  error "FIX ME"
 -- * TH
 -- ** Type
 data FieldDesc = FieldDesc
-  { fdTName :: String -- ^ Type name
-  , fdCName :: String -- ^ Constructor name
-  , fdPos :: Int -- ^ position within the constructor
-  , fdFName :: Maybe String -- ^ Field Name if Recorder
-  , fdBang :: Bang
-  , fdTypes :: [String] -- ^ [] means no field at all (ex Enum)
-  , fdMName :: Maybe String -- ^ Module name . only used to use proper constructor name
+  { _fdTName :: String -- ^ Type name
+  , _fdCName :: String -- ^ Constructor name
+  , _fdPos :: Int -- ^ position within the constructor
+  , _fdFName :: Maybe String -- ^ Field Name if Recorder
+  , _fdBang :: Bang
+  , _fdTypes :: [String] -- ^ [] means no field at all (ex Enum)
+  , _fdMName :: Maybe String -- ^ Module name . only used to use proper constructor name
 
   } deriving (Show, Eq, Ord)
+
+makeLenses ''FieldDesc
 
 -- | poor man refinement type
 -- Just a way to tell that some functions want or generate sorted list
@@ -113,13 +75,13 @@ metamorphosis f names = do
 
 collectFields :: Info -> [FieldDesc]
 collectFields (TyConI (DataD cxt tName vars kind cons cxt')) = concatMap go cons where
-  go (NormalC cName []) =  [ FieldDesc { fdTName = nameBase tName
-                                     , fdCName = nameBase cName
-                                     , fdFName = Nothing
-                                     , fdPos = 0
-                                     , fdBang = (Bang NoSourceUnpackedness NoSourceStrictness)
-                                     , fdTypes = []
-                                     , fdMName = nameModule tName
+  go (NormalC cName []) =  [ FieldDesc { _fdTName = nameBase tName
+                                     , _fdCName = nameBase cName
+                                     , _fdFName = Nothing
+                                     , _fdPos = 0
+                                     , _fdBang = (Bang NoSourceUnpackedness NoSourceStrictness)
+                                     , _fdTypes = []
+                                     , _fdMName = nameModule tName
                                      }
                            ]
   go (NormalC cName bangs) =  zipWith (go' cName) bangs [1..]
@@ -128,16 +90,16 @@ collectFields (TyConI (DataD cxt tName vars kind cons cxt')) = concatMap go cons
                                  , go' cName bang' 2
                                  ]
 
-  go' cName (bang, typ) pos = FieldDesc { fdTName = nameBase tName
-                                    , fdCName = nameBase cName
-                                    , fdFName = Nothing
-                                    , fdPos  = pos
-                                    , fdBang = bang
-                                    , fdTypes = typeToChain typ
-                                    , fdMName = nameModule tName
+  go' cName (bang, typ) pos = FieldDesc { _fdTName = nameBase tName
+                                    , _fdCName = nameBase cName
+                                    , _fdFName = Nothing
+                                    , _fdPos  = pos
+                                    , _fdBang = bang
+                                    , _fdTypes = typeToChain typ
+                                    , _fdMName = nameModule tName
                                     }
 
-  go'' cName (fName, bang, typ) pos = (go' cName (bang, typ) pos) {fdFName = Just (nameBase fName)}
+  go'' cName (fName, bang, typ) pos = (go' cName (bang, typ) pos) {_fdFName = Just (nameBase fName)}
 collectFields info = error $ "collectFields only works with type declaration." ++ show ( ppr info )
 
 generateType :: GroupedByType -> Dec
@@ -157,31 +119,31 @@ generateCons (GroupedByCons mName cName fields) = let
     Just varbangs -> RecC (mkName cName) (varbangs)
 
 toBangType :: FieldDesc -> Maybe BangType
-toBangType field = fmap (\t -> (fdBang field, t)) (toType field)
+toBangType field = fmap (\t -> (_fdBang field, t)) (toType field)
 toVarBangType :: FieldDesc -> Maybe VarBangType
-toVarBangType field = case fdFName field of
+toVarBangType field = case _fdFName field of
   Nothing -> Nothing
-  Just name -> fmap (\t -> (mkName name, fdBang field, t)) (toType field)
+  Just name -> fmap (\t -> (mkName name, _fdBang field, t)) (toType field)
 
 toType :: FieldDesc -> Maybe Type
-toType field = chainToType (fdTypes field)
+toType field = chainToType (_fdTypes field)
 
 -- | Extract parametric variables from a field
 getVars :: FieldDesc -> [TyVarBndr]
 getVars field = let
-  vars = filter (isVar) (fdTypes field)
+  vars = filter (isVar) (_fdTypes field)
   in map (PlainTV . mkName) vars
    
 groupByType :: [FieldDesc] -> [GroupedByType]
 groupByType fields =  let
   sorted = sort fields
-  groups = groupBy ((==) `on` fdTName) fields
-  in [GroupedByType (fdMName master) (fdTName master) group | group <- groups, let master = head group ]
+  groups = groupBy ((==) `on` _fdTName) fields
+  in [GroupedByType (_fdMName master) (_fdTName master) group | group <- groups, let master = head group ]
 groupByCons :: GroupedByType -> [GroupedByCons]
 groupByCons  (GroupedByType _ _ fields)= let
   sorted = sort fields
-  groups = groupBy ((==) `on` fdCName) fields
-  in [GroupedByCons (fdMName master) (fdCName master) group | group <- groups, let master = head group ]
+  groups = groupBy ((==) `on` _fdCName) fields
+  in [GroupedByCons (_fdMName master) (_fdCName master) group | group <- groups, let master = head group ]
 
 
 printDecs :: String ->  Q [Dec] ->  Q [Dec]
@@ -199,8 +161,8 @@ capitalize [] = []
 capitalize (c:cs) = toUpper c : cs
 
 -- ** FieldDesc Combinator
-fdName :: String -> FieldDesc -> [FieldDesc]
-fdName name fd = [fd {fdTName = name, fdCName = name }]
+_fdName :: String -> FieldDesc -> [FieldDesc]
+_fdName name fd = [fd {_fdTName = name, _fdCName = name }]
 
 
 -- * convert
@@ -233,7 +195,7 @@ buildExtractClauses f fields targets bfields = let
   -- | Transform a field and check if matches the required targets
   trans :: FieldDesc -> Maybe [FieldDesc]
   trans field = let newFields = f field
-                in if all ((`elem` targets) . fdTName) newFields
+                in if all ((`elem` targets) . _fdTName) newFields
                       then Just newFields
                       else Nothing
   groups = groupByType fields
@@ -252,11 +214,11 @@ buildExtractClause f names groups btypes =  let
   fieldPats fields = map fieldPat fields
   fieldPat field = case f field of
     [] -> WildP
-    _ -> VarP (fdPatName field)
+    _ -> VarP (_fdPatName field)
 
   fields = concat [ fields | (GroupedByCons _ _ fields) <- groups ]
   newFields = recomputeFDPositions (concatMap f fields)
-  fieldAssoc = Map.fromList [ ((fdCName new, fdPos new), fdPatName field) | (field, new) <- zip fields newFields ]
+  fieldAssoc = Map.fromList [ ((_fdCName new, _fdPos new), _fdPatName field) | (field, new) <- zip fields newFields ]
   body = TupE (map (consBody fieldAssoc) btypes)
   -- in traceShowId $ Just $ Clause (map ParensP pats) (NormalB body) []
   result = Clause (map ParensP pats) (NormalB body) []
@@ -267,16 +229,16 @@ buildExtractClause f names groups btypes =  let
 recomputeFDPositions :: [FieldDesc] -> [FieldDesc]
 recomputeFDPositions fields = let
   groups = map (map go . groupByCons) (groupByType fields)
-  go group@(GroupedByCons _ _ fields) = zipWith (\fd i -> fd { fdPos = i }) fields [1..]
+  go group@(GroupedByCons _ _ fields) = zipWith (\fd i -> fd { _fdPos = i }) fields [1..]
   in concatMap (concat) groups
 
-fdPatName :: FieldDesc -> Name
-fdPatName field = mkName $ fromMaybe ("v" ++ show (fdPos field)) (fdFName field)
+_fdPatName :: FieldDesc -> Name
+_fdPatName field = mkName $ fromMaybe ("v" ++ show (_fdPos field)) (_fdFName field)
 
 consBody :: Map (String, Int) Name -> GroupedByType -> Exp
 consBody varMap (GroupedByType mname typ fields) = let
   vars = map findVar fields 
-  findVar fd = case Map.lookup ((fdCName fd, fdPos fd)) varMap of
+  findVar fd = case Map.lookup ((_fdCName fd, _fdPos fd)) varMap of
     Nothing -> error $ "can't extract field " ++ show fd
     Just vname -> VarE vname
   result =  foldl (\x y -> AppE (AppE (VarE (mkName "ap")) x) y)

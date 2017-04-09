@@ -27,22 +27,22 @@ unique = Unique
 plain = Plain "code" 4.5
 abc = [A, B, C ]
 
-$(metamorphosis (\fd -> [fd { fdTName = fdTName fd ++ "M"
-                            , fdCName = fdCName fd ++ "M"
-                            , fdTypes = "Maybe" : fdTypes fd
+$(metamorphosis (\fd -> [fd { _fdTName = _fdTName fd ++ "M"
+                            , _fdCName = _fdCName fd ++ "M"
+                            , _fdTypes = "Maybe" : _fdTypes fd
                             }]) [''D.Record])
 
-$(metamorphosis (\fd -> [fd { fdTName = fdTName fd ++ "F"
-                            , fdCName = fdCName fd ++ "F"
-                            , fdTypes = "f" : fdTypes fd
+$(metamorphosis (\fd -> [fd { _fdTName = _fdTName fd ++ "F"
+                            , _fdCName = _fdCName fd ++ "F"
+                            , _fdTypes = "f" : _fdTypes fd
                             }]) [''D.Record])
-$(generateExtract (\fd -> [fd { fdTName = fdTName fd ++ "F"
-                            , fdCName = fdCName fd ++ "F"
-                            , fdTypes = "f" : fdTypes fd
+$(generateExtract (\fd -> [fd { _fdTName = _fdTName fd ++ "F"
+                            , _fdCName = _fdCName fd ++ "F"
+                            , _fdTypes = "f" : _fdTypes fd
                             }]) [''Examples.Data.Record] [''RecordF] "extractFF")
-$(generateExtract (\fd -> [fd { fdTName = init $ fdTName fd
-                            , fdCName = init $ fdCName fd
-                            , fdTypes = drop 1 $ fdTypes fd
+$(generateExtract (\fd -> [fd { _fdTName = init $ _fdTName fd
+                            , _fdCName = init $ _fdCName fd
+                            , _fdTypes = drop 1 $ _fdTypes fd
                             }]) [''RecordF] [''D.Record] "extractFFF")
 
 -- instance Monad f => ExtractF Examples.Data.Record f (RecordF f) where
@@ -55,44 +55,44 @@ instance Monad f => ExtractF (RecordF f) f D.Record where
 recordF :: Applicative f => RecordF f
 recordF = RecordF (pure "code") (pure 4.5)
 -- * Flatten SUM type
-$(metamorphosis (\fd -> [ fd  { fdTName = "ABC'"
-                              , fdCName = "ABC'"
-                              , fdFName = Just (map toLower $ fdCName fd)
-                              , fdTypes = ["Bool"]
+$(metamorphosis (\fd -> [ fd  { _fdTName = "ABC'"
+                              , _fdCName = "ABC'"
+                              , _fdFName = Just (map toLower $ _fdCName fd)
+                              , _fdTypes = ["Bool"]
                               }]
                  )
                  [''D.ABC]
  )
  -- * Product to Sum type
-$(metamorphosis (\fd -> [ fd  { fdTName = "RSum'"
-                              , fdCName = "RSum" ++ (capitalize . fromJust $ fdFName fd)
-                              , fdFName = Nothing
+$(metamorphosis (\fd -> [ fd  { _fdTName = "RSum'"
+                              , _fdCName = "RSum" ++ (capitalize . fromJust $ _fdFName fd)
+                              , _fdFName = Nothing
                               }]
                  )
                  [''D.Record]
  )
 -- * Enum for field
-$(metamorphosis (\fd -> [ fd  { fdTName = "RField'"
-                              , fdCName = "R" ++ (capitalize . fromJust $ fdFName fd) ++ "E"
-                              , fdFName = Nothing
-                              , fdTypes = []
+$(metamorphosis (\fd -> [ fd  { _fdTName = "RField'"
+                              , _fdCName = "R" ++ (capitalize . fromJust $ _fdFName fd) ++ "E"
+                              , _fdFName = Nothing
+                              , _fdTypes = []
                               }]
                  )
                  [''D.Record]
  )
 -- * Product to many classes
-$(metamorphosis (\fd -> [ fd  { fdTName = "R" ++ (capitalize . fromJust $ fdFName fd)
-                              , fdCName = "R" ++ (capitalize . fromJust $ fdFName fd)
-                              , fdFName = Nothing
+$(metamorphosis (\fd -> [ fd  { _fdTName = "R" ++ (capitalize . fromJust $ _fdFName fd)
+                              , _fdCName = "R" ++ (capitalize . fromJust $ _fdFName fd)
+                              , _fdFName = Nothing
                               } ]
                  )
                  [''D.Record]
  )
 
 -- * Recordize
-$(metamorphosis (\fd -> [ fd  { fdTName = "PlainR"
-                              , fdCName = "PlainR"
-                              , fdFName = map Just ["code", "price"] !! (fdPos fd - 1)
+$(metamorphosis (\fd -> [ fd  { _fdTName = "PlainR"
+                              , _fdCName = "PlainR"
+                              , _fdFName = map Just ["code", "price"] !! (_fdPos fd - 1)
                               } ]
                  )
                  [''D.Plain]
@@ -103,14 +103,14 @@ plainr = PlainR {code = "plain", price =10}
 
 -- -- * Merge to record
 -- should be a  setter 
-$(metamorphosis (fdName "RecordQ" . (\fd -> fd {fdFName = fmap (++"Q") (fdFName fd )})) [''D.Record, ''D.Quantity])
-$(generateExtract (\fd -> let typ = if fdFName fd == (Just "quantityQ")
+$(metamorphosis (_fdName "RecordQ" . (\fd -> fd {_fdFName = fmap (++"Q") (_fdFName fd )})) [''D.Record, ''D.Quantity])
+$(generateExtract (\fd -> let typ = if _fdFName fd == (Just "quantityQ")
                                         then "Quantity"
                                         else "Record"
-                          in [ fd { fdMName = Just "D"
-                                  , fdTName =  typ
-                                  , fdCName = typ
-                                  , fdFName = fmap init (fdFName fd)
+                          in [ fd { _fdMName = Just "D"
+                                  , _fdTName =  typ
+                                  , _fdCName = typ
+                                  , _fdFName = fmap init (_fdFName fd)
                                   }
                              ] )
                   [''RecordQ]
@@ -118,9 +118,9 @@ $(generateExtract (\fd -> let typ = if fdFName fd == (Just "quantityQ")
                   "extractQ")
 deriving instance Show RecordQ
 recordq = RecordQ { codeQ = "q", quantityQ = 10, priceQ = 2.3}
-$(metamorphosis (fdName "RecordPLain") [''D.Record, ''D.Plain])
+$(metamorphosis (_fdName "RecordPLain") [''D.Record, ''D.Plain])
 -- * filter fields
-$(metamorphosis (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
+$(metamorphosis (_fdName "RecordSmall" >=> \fd -> if _fdFName fd == Just "price"
                               then []
                               else [fd]
                 )
@@ -128,7 +128,7 @@ $(metamorphosis (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
  )
 deriving instance Show RecordSmall
 
-$(generateExtract (fdName "RecordSmall" >=> \fd -> if fdFName fd == Just "price"
+$(generateExtract (_fdName "RecordSmall" >=> \fd -> if _fdFName fd == Just "price"
                               then []
                               else [fd]
                 )
