@@ -104,11 +104,62 @@ productMSpecs =
     it "extracts from a productM" $ do
       productFToProductA (productToProductF p) `shouldBe` Just p
   
+-- * 
+-- Using two functors parameter we can get different responses
+-- by converting to different functor
+-- data ProductF2 f g =
+--   ProductF2 { style :: f String
+--             , variation :: g String
+--             , price :: Double
+--             , quantity :: Int
+--             }
+
+$(metamorphosis'
+   ( return
+   . (\fd -> fdTypes %~ (case _fdFName fd of
+                              Just "style" -> ("f":) 
+                              Just "variation" ->  ("g":)
+                              _ -> id
+                        ) $ fd
+     )
+   . (fdTName .~ "ProductF2")
+   . (fdCName .~ "ProductF2")
+   )
+   [''Product] ["ProductF2"]
+ )
+$(generateExtract return [''ProductF2] [''ProductF2] "productF2ToProductF2A")
+
+deriving instance Show (ProductF2 [] [])
+deriving instance Eq (ProductF2 [] [])
+deriving instance Show (ProductF2 [] Identity)
+deriving instance Eq (ProductF2 [] Identity)
+deriving instance Show (ProductF2 Identity [])
+deriving instance Eq (ProductF2 Identity [])
+
+productF2Specs =
+  describe "ProductF2" $ do
+    let pf = ProductF2 ["A", "B"] ["red", "black"] 7 1
+    it "extracts bot fields" $ do
+        productF2ToProductA pf `shouldBe` [ Product "A" "red" 7 1
+                                          , Product "A" "black" 7 1
+                                          , Product "B" "red" 7 1
+                                          , Product "B" "black" 7 1
+                                          ]
+    it "extracts styles" $ do
+      productF2ToProductF2A pf `shouldBe` [ ProductF2 (Identity "A") ["red", "black"] 7 1
+                                          , ProductF2 (Identity "B") ["red", "black"] 7 1
+                                          ]
+    it "extracts variations" $ do
+      productF2ToProductF2A pf `shouldBe` [ ProductF2 ["A", "B"] (Identity "red") 7 1
+                                          , ProductF2 ["A", "B"] (Identity "black") 7 1
+                                          ]
+
 spec :: Spec
 spec = do
   styleSpecs
   productFSpecs
   productMSpecs
+  productF2Specs
 
 
 

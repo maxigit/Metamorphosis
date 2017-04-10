@@ -222,10 +222,11 @@ generateExtract f as bs fname = do
       bFields = concatMap collectFields bInfos
       bnames = map nameBase bs
 
-      clauses = buildExtractClauses f aFields bnames bFields
       result =  generateExtract' f aFields bnames bFields fname
   return result
 
+generateExtract' :: (FieldDesc -> [FieldDesc])
+  -> [FieldDesc] -> [String] -> [FieldDesc] -> String -> [Dec]
 generateExtract' f aFields bnames bFields fname = let
       clauses = buildExtractClauses f aFields bnames bFields
       fun = FunD (mkName fname) clauses
@@ -346,6 +347,8 @@ class ExtractF a f b where
 
 instance Applicative f => ExtractF a f a where
   extractF  = pure
+instance ExtractF [a] [] (Identity a) where
+  extractF  = map pure
 instance Applicative f => ExtractF (f a) f a where
   extractF  = id
 instance Applicative f => ExtractF a Identity (f a) where
