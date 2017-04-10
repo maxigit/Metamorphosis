@@ -54,15 +54,6 @@ $(metamorphosis'
    )
    [''Product] ["ProductF"]
  )
-$(generateExtract
-   ( return
-   . (fdTName .~ "Product")
-   . (fdCName .~ "Product")
-   . (fdTypes %~ init)
-   )
-   [''ProductF] [''Product]
-   "productFToProductA"
- )
 deriving instance Show (ProductF Maybe)
 deriving instance Eq (ProductF Maybe)
 
@@ -105,8 +96,8 @@ spec = do
   describe "ProductM -- one functor" $ do
     it "gets from a product" $ do
       productToProductM product `shouldBe` (ProductM "style" "var" [15.50] 2)
-    -- it "extracts from a productM" $ do
-    --   productFToProductA (productToProductF product) `shouldBe` Just product
+    it "extracts from a productM" $ do
+      productFToProductA (productToProductF product) `shouldBe` Just product
 
 
 

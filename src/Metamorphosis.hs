@@ -15,6 +15,7 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 import Data.Functor.Identity
 import Lens.Micro.TH
+import Data.Monoid
 
 type TName = String -- Type name
 type CName = String -- Constructor name
@@ -170,6 +171,17 @@ groupByCons  (GroupedByType _ _ fields)= let
   groups = groupBy ((==) `on` _fdCName) fields
   in [GroupedByCons (_fdMName master) (_fdCName master) group | group <- groups, let master = head group ]
 
+-- | Generates the inverse mapping FieldDesc function. For this, we need
+-- the function but also the "source" of the function to generate the inverse
+-- from the "image" to the "source".
+inverseFieldFun :: ((FieldDesc) -> [FieldDesc]) -> [FieldDesc] -> (FieldDesc -> [FieldDesc])
+inverseFieldFun a2b aFields = let
+  -- We build a map (f fd, f) and transform it to a function
+  assocs = Map.fromListWith (<>) [ (new, [field]) 
+                       | field <- aFields
+                       , new <- a2b field
+                       ]
+  in \fd -> Map.findWithDefault [] fd assocs 
 
 printDecs :: String ->  Q [Dec] ->  Q [Dec]
 printDecs name qDecs = do
@@ -216,7 +228,9 @@ generateExtract f as bs fname = do
 
 generateExtract' f aFields bnames bFields fname = let
       clauses = buildExtractClauses f aFields bnames bFields
-      in [ FunD (mkName fname) clauses ]
+      fun = FunD (mkName fname) clauses
+      in traceShow (ppr fun) [fun]
+      -- in [fun]
 
 buildExtractClauses :: (FieldDesc -> [FieldDesc]) -> [FieldDesc] -> [String] -> [FieldDesc] -> [Clause]
 buildExtractClauses f fields targets bfields = let
@@ -271,14 +285,15 @@ consBody :: Map Name Name -> GroupedByType -> Exp
 consBody varMap (GroupedByType mname typ fields) = let
   vars = map findVar fields 
   findVar fd = case Map.lookup (_fdPatName fd) varMap of
-    Nothing -> error $ "can't extract field " ++ show fd
+    Nothing -> TupE []
     Just vname -> VarE vname
   result =  foldl (\x y -> UInfixE x (VarE $ mkName "<*>" ) y)
            (AppE (VarE (mkName "pure"))
                  (ConE (mkName $ maybe "" (++ "." ) mname ++ typ))
            )
            (map (AppE (VarE $ mkName "extractF")) vars)
-  in traceShow (varMap, ppr result) result
+  -- in traceShow (varMap, ppr result) result
+  in result
  -- pat = patTuble 
   -- A x
   -- A y
@@ -297,18 +312,24 @@ consBody varMap (GroupedByType mname typ fields) = let
 -- the target names are string, as generated data types are not available
 -- to TH yet
 metamorphosis' :: (FieldDesc -> [FieldDesc]) -> [Name] ->[String] -> Q [Dec]
-metamorphosis' f anames bnames = do
-  typeDecs <- metamorphosis f anames
+metamorphosis' a2b anames bbases = do
+  typeDecs <- metamorphosis a2b anames
 
   aInfos <- mapM reify anames
   let aFields = concatMap collectFields  aInfos
-      bFields = concatMap f aFields
+      bFields = concatMap a2b aFields
+      abases = map nameBase anames
 
-      convertName = extractName (map nameBase anames) bnames
-      convertDecs = generateExtract' f aFields bnames bFields convertName
+      b2a = inverseFieldFun a2b aFields
 
-  return (typeDecs ++ convertDecs)
+      a2bDecs = genExtractAndName a2b abases bbases aFields bFields
+      b2aDecs = genExtractAndName b2a bbases abases bFields aFields
+  
+  return (typeDecs ++ a2bDecs ++ b2aDecs)
 
+genExtractAndName f abases bbases aFields bFields =  let
+      a2bName = extractName abases bbases
+      in generateExtract' f aFields abases bFields a2bName
 
 -- generate the name of the extract function
 extractName :: [String] -> [String] -> String
@@ -320,16 +341,6 @@ aggregateNames names = uncapitalize $ concatMap (capitalize) names
 
   
 
-
-  
- 
--- | like inject but whereas inject is losless, tranfer isn't.
--- There is no way to extract the inject result.
-
-class Transfer a e where
-  transfer :: a -> e -> a
-  recover :: a -> Maybe e
- 
 class ExtractF a f b where
   extractF ::a -> f b
 
