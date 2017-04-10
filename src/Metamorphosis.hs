@@ -21,6 +21,8 @@ type CName = String -- Constructor name
 type FName = String -- field name
 
 
+-- | Converts a type (AST) to a list of String (chain)
+-- ex: Maybe Int -> ["Maybe", "Int"]
 typeToChain :: Type -> [String]
 typeToChain (ForallT _ _ typ ) = typeToChain typ
 typeToChain (AppT f t) = typeToChain f ++ typeToChain t
@@ -30,6 +32,8 @@ typeToChain (ConT t) = [nameBase t]
 typeToChain (PromotedT t) = [nameBase t]
 typeToChain info = error $ "typeToChain not implemented for :" ++ show info
              
+-- | Converts a list of string (chain) to an AST type
+-- ex: ["Maybe", "Int"] -> Maybe Int
 chainToType :: [String] -> Maybe Type
 chainToType [] = Nothing
 chainToType [t] | isVar t = Just $ VarT (mkName t)
@@ -37,6 +41,7 @@ chainToType [t] | isVar t = Just $ VarT (mkName t)
 chainToType (t:ts) =  liftM2 AppT (chainToType [t]) (chainToType ts)
   
 
+-- | Check if a variable name is a variable or a constructor (upper case)
 isVar [] = False
 isVar (c:cs) = isLower c
 
@@ -44,6 +49,8 @@ sequence =  error "FIX ME"
 
 -- * TH
 -- ** Type
+-- | Represents the field of a data (within its' contructor)
+-- For example, data A = A { x :: Int} will have one field A.A.x [Int]
 data FieldDesc = FieldDesc
   { _fdTName :: String -- ^ Type name
   , _fdCName :: String -- ^ Constructor name
@@ -74,6 +81,7 @@ metamorphosis f names = do
       newFields = concatMap f fields
   return $ map generateType (groupByType newFields)
 
+-- Retrieves the field descriptions of data type (from its Info)
 collectFields :: Info -> [FieldDesc]
 collectFields (TyConI (DataD cxt tName vars kind cons cxt')) = concatMap go cons where
   go (NormalC cName []) =  [ FieldDesc { _fdTName = nameBase tName
@@ -103,12 +111,17 @@ collectFields (TyConI (DataD cxt tName vars kind cons cxt')) = concatMap go cons
   go'' cName (fName, bang, typ) pos = (go' cName (bang, typ) pos) {_fdFName = Just (nameBase fName)}
 collectFields info = error $ "collectFields only works with type declaration." ++ show ( ppr info )
 
+-- | Opposite of {collectFields} : generate a data type from a (grouped) list  of FieldDesc.
+-- Can generates sum and record types as well as parametric types.
+-- example [(A.A.a, [Int]), (A.A.b, [f, Int]), (A.B.name, String)  ] will generateType
+-- data A f = A { a :: Int, b :: f Int } | B { name :: String}
 generateType :: GroupedByType -> Dec
 generateType group@(GroupedByType mName tName fields) = let
   cons = groupByCons group
   vars = nub $ sort (concatMap getVars fields) 
   in DataD [] (mkName tName) vars Nothing (map generateCons cons) []
 
+-- | Generates the constructor clause of type given a (grouped) list of FieldDesc.
 generateCons :: GroupedByCons -> Con
 generateCons (GroupedByCons mName cName fields) = let
   sorted = sort fields -- sort by position
@@ -119,27 +132,38 @@ generateCons (GroupedByCons mName cName fields) = let
     Just [] -> NormalC cname []
     Just varbangs -> RecC (mkName cName) (varbangs)
 
+-- | Convert a {FieldDesc}  to a TH {BangType} : a field without name  in a constructor declaration
+-- ex : !Int in data A =  A !Int 
 toBangType :: FieldDesc -> Maybe BangType
 toBangType field = fmap (\t -> (_fdBang field, t)) (toType field)
+
+-- | Convert a {FieldDesc}  to a TH {VarBangType} : a field a name  in a record declaration
+-- ex : x :: Int in data R =  R { x :: Int }
 toVarBangType :: FieldDesc -> Maybe VarBangType
 toVarBangType field = case _fdFName field of
   Nothing -> Nothing
   Just name -> fmap (\t -> (mkName name, _fdBang field, t)) (toType field)
 
+-- | Get the Type of a FieldDesc
 toType :: FieldDesc -> Maybe Type
 toType field = chainToType (_fdTypes field)
 
 -- | Extract parametric variables from a field
+-- example "f Int" -> ["f"]
 getVars :: FieldDesc -> [TyVarBndr]
 getVars field = let
   vars = filter (isVar) (_fdTypes field)
   in map (PlainTV . mkName) vars
    
+-- | Groups a list of FieldDesc by Type.
 groupByType :: [FieldDesc] -> [GroupedByType]
 groupByType fields =  let
   sorted = sort fields
   groups = groupBy ((==) `on` _fdTName) fields
   in [GroupedByType (_fdMName master) (_fdTName master) group | group <- groups, let master = head group ]
+
+-- | Groups a list of FieldDesc by Constructor.
+-- All the FieldDesc should belongs to the same Type. Enforced by GroupedByType
 groupByCons :: GroupedByType -> [GroupedByCons]
 groupByCons  (GroupedByType _ _ fields)= let
   sorted = sort fields
@@ -170,17 +194,13 @@ _fdName name fd = [fd {_fdTName = name, _fdCName = name }]
 
 
 -- * convert
--- | a contains e. We can extract an e from a a and therefore reinject it.
-class Has a e where
-  extract :: a -> e
-  inject :: a -> e -> a
-
-  -- law -- extract = id
-  -- inject a . extract = id
-
 -- | Generates an extract function from a set of types to a set of types
--- example XYZ -> (XY, Z)
--- will generate extract (X x y z) = (XY x y, Z z)
+-- In order to be able to "traverse" the generated function return a tuple of applicative
+-- example XYZ -> (m1 XY, m2 Z)
+-- will generate extract (X x y z) = (XY <$> extractF  x <*> extractF y, Z <$> extractF z)
+-- extractF is used to convert between different type of applicative.
+-- Example, if we have `data XYZ = XYZ Int Int (Maybe Int); data XY = XY Int Int ` but `data Z = Z Int`
+-- xyzToXy`y would have in practive the type `XYZ -> (Identity XY, Maybe Z)`
 generateExtract :: (FieldDesc -> [FieldDesc]) -> [Name] -> [Name] -> String ->  DecsQ
 generateExtract f as bs fname = do
   aInfos <- mapM reify as
@@ -225,8 +245,10 @@ buildExtractClause f names groups btypes =  let
     _ -> VarP (_fdPatName field)
 
   fields = concat [ fields | (GroupedByCons _ _ fields) <- groups ]
-  newFields = recomputeFDPositions (concatMap f fields)
-  fieldAssoc = Map.fromList [ ((_fdCName new, _fdPos new), _fdPatName field) | (field, new) <- zip fields newFields ]
+  fieldAssoc = Map.fromList [ (_fdPatName new, _fdPatName field)
+                            | (news, field) <- zip (map f fields) fields
+                            , new <- news 
+                            ]
   body = TupE (map (consBody fieldAssoc) btypes)
   -- in traceShowId $ Just $ Clause (map ParensP pats) (NormalB body) []
   result = Clause (map ParensP pats) (NormalB body) []
@@ -241,12 +263,14 @@ recomputeFDPositions fields = let
   in concatMap (concat) groups
 
 _fdPatName :: FieldDesc -> Name
-_fdPatName field = mkName $ fromMaybe ("v" ++ show (_fdPos field)) (_fdFName field)
+_fdPatName field = mkName $ "_" ++ _fdCName field
+                         ++ fromMaybe ("v" ++ show (_fdPos field))
+                                      (_fdFName field)
 
-consBody :: Map (String, Int) Name -> GroupedByType -> Exp
+consBody :: Map Name Name -> GroupedByType -> Exp
 consBody varMap (GroupedByType mname typ fields) = let
   vars = map findVar fields 
-  findVar fd = case Map.lookup ((_fdCName fd, _fdPos fd)) varMap of
+  findVar fd = case Map.lookup (_fdPatName fd) varMap of
     Nothing -> error $ "can't extract field " ++ show fd
     Just vname -> VarE vname
   result =  foldl (\x y -> UInfixE x (VarE $ mkName "<*>" ) y)
@@ -254,7 +278,7 @@ consBody varMap (GroupedByType mname typ fields) = let
                  (ConE (mkName $ maybe "" (++ "." ) mname ++ typ))
            )
            (map (AppE (VarE $ mkName "extractF")) vars)
-  in traceShow (ppr result) result
+  in traceShow (varMap, ppr result) result
  -- pat = patTuble 
   -- A x
   -- A y
@@ -315,6 +339,10 @@ instance Applicative f => ExtractF (f a) f a where
   extractF  = id
 instance Applicative f => ExtractF a Identity (f a) where
   extractF = pure . pure
+instance ExtractF () Maybe a where
+  extractF () = Nothing
+instance Monoid a => ExtractF () Identity a where
+  extractF () = Identity mempty
 
 instance (Applicative f, ExtractF a f a', ExtractF b f b') => ExtractF (a, b) f (a',b') where
   extractF (a,b) = (,) <$> extractF a <*> extractF b

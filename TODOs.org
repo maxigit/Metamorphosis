@@ -1,0 +1,8 @@
+* TODO
+- [ ] Add Names lenses
+To modify type name and constructor names at once
+- [ ] Add prefix lenses
+To replace _oldField by _newField or oldField -> newField
+- [X] Refactors field lookup
+- [X] generates backward function from function + Inputs
+Not needed. We just use PatName instead.
