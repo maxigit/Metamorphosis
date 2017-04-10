@@ -18,6 +18,8 @@ data Product = Product { style :: String
                        , quantity :: Int
                        } deriving (Show, Eq)
 
+p = Product "style" "var" 15.50 2 
+
 -- | Generates Style type
 -- data Style = Style { style :: String
 --                    , price :: Double
@@ -38,6 +40,12 @@ productToStyle = runIdentity . productToStyleA
 styleInProduct = undefined
 
  
+styleSpecs = 
+  describe "Style" $ do
+    it "gets from a p" $ do
+      productToStyle p `shouldBe` (Style "style" 15.50)
+    it "sets to a p" $ do
+      styleInProduct (Style "new" 7) p `shouldBe` (Product "new" "var" 7.0 2)
 
 -- | Generates ProductF type
 -- data ProductF f = ProductF { style :: f String
@@ -56,6 +64,13 @@ $(metamorphosis'
  )
 deriving instance Show (ProductF Maybe)
 deriving instance Eq (ProductF Maybe)
+
+productFSpecs =
+  describe "ProductF -- parametric functor" $ do
+    it "gets from a p" $ do
+      productToProductF p `shouldBe` (ProductF (Just "style") (Just "var") (Just 15.50) (Just 2))
+    it "extracts from a productM" $ do
+      productFToProductA (productToProductF p) `shouldBe` Just p
 
 -- | Generates ProductM type
 -- data ProductM = ProductF { style :: String
@@ -80,25 +95,20 @@ deriving instance Show ProductM
 deriving instance Eq ProductM 
 
 productToProductM = runIdentity . productToProductMA
+
+
+productMSpecs =
+  describe "ProductM -- one functor" $ do
+    it "gets from a p" $ do
+      productToProductM p `shouldBe` (ProductM "style" "var" [15.50] 2)
+    it "extracts from a productM" $ do
+      productFToProductA (productToProductF p) `shouldBe` Just p
+  
 spec :: Spec
 spec = do
-  let product = Product "style" "var" 15.50 2 
-  describe "Style" $ do
-    it "gets from a product" $ do
-      productToStyle product `shouldBe` (Style "style" 15.50)
-    it "sets to a product" $ do
-      styleInProduct (Style "new" 7) product `shouldBe` (Product "new" "var" 7.0 2)
-  describe "ProductF -- parametric functor" $ do
-    it "gets from a product" $ do
-      productToProductF product `shouldBe` (ProductF (Just "style") (Just "var") (Just 15.50) (Just 2))
-    it "extracts from a productM" $ do
-      productFToProductA (productToProductF product) `shouldBe` Just product
-  describe "ProductM -- one functor" $ do
-    it "gets from a product" $ do
-      productToProductM product `shouldBe` (ProductM "style" "var" [15.50] 2)
-    it "extracts from a productM" $ do
-      productFToProductA (productToProductF product) `shouldBe` Just product
-
+  styleSpecs
+  productFSpecs
+  productMSpecs
 
 
 
