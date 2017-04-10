@@ -31,6 +31,7 @@ typeToChain (SigT t _ ) = typeToChain t
 typeToChain (VarT n) = [nameBase n]
 typeToChain (ConT t) = [nameBase t]
 typeToChain (PromotedT t) = [nameBase t]
+typeToChain (ListT) = ["[]"]
 typeToChain info = error $ "typeToChain not implemented for :" ++ show info
              
 -- | Converts a list of string (chain) to an AST type
@@ -210,7 +211,7 @@ _fdName name fd = [fd {_fdTName = name, _fdCName = name }]
 -- In order to be able to "traverse" the generated function return a tuple of applicative
 -- example XYZ -> (m1 XY, m2 Z)
 -- will generate extract (X x y z) = (XY <$> extractF  x <*> extractF y, Z <$> extractF z)
--- extractF is used to convert between different type of applicative.
+-- extractF is used to convert between different type of applicative.a
 -- Example, if we have `data XYZ = XYZ Int Int (Maybe Int); data XY = XY Int Int ` but `data Z = Z Int`
 -- xyzToXy`y would have in practive the type `XYZ -> (Identity XY, Maybe Z)`
 generateExtract :: (FieldDesc -> [FieldDesc]) -> [Name] -> [Name] -> String ->  DecsQ
@@ -341,7 +342,78 @@ aggregateNames :: [String] -> String
 aggregateNames names = uncapitalize $ concatMap (capitalize) names
 
   
+-- * Generate Set
+generateSet :: (FieldDesc -> [FieldDesc]) -> [Name] -> [Name] -> String -> DecsQ
+generateSet a2b as bs fname = do
+  aInfos <- mapM reify as
+  bInfos <- mapM reify bs
 
+  let aFields = concatMap collectFields aInfos
+      bFields = concatMap collectFields bInfos
+      bnames = map nameBase bs
+      anames = map nameBase as
+
+      b2a = inverseFieldFun a2b aFields
+
+      -- result =  generateSet' a2b aFields bnames bFields fname
+      result =  generateSet' b2a bFields bnames aFields fname
+ 
+  return result
+  
+generateSet' a2b aFields bnames bFields fname = let
+  clauses = buildSetClauses a2b aFields bnames bFields
+  fun = FunD (mkName fname) clauses
+  in traceShow (ppr fun) [fun]
+     -- in [fun]
+
+-- | Generates aInB  :: a -> b -> b
+-- by trying all a and b constructor combinations
+-- ex data A = A1 x | A2 y , data B = B1 x z | B2 y z
+-- aInB (A1 a1x) (B1 b1x b1z) = B1 <$> extractF a1x <*> extractF b1z
+-- aInB (A2 a2x) (B1 b1x b1z) = B1 <$> extractF b1z <*> extractF b1z
+buildSetClauses :: (FieldDesc -> [FieldDesc]) -> [FieldDesc] -> [String] -> [FieldDesc] -> [Clause]
+buildSetClauses f afields targets bfields = let
+  agroups = groupByType afields
+  bgroups = groupByType bfields
+  -- generates all constructor combinations of both A and B types
+  go :: [GroupedByCons] -> [GroupedByCons] -> [GroupedByType] -> [GroupedByType] -> [Clause]
+  go [] [] [] [] = error $ "Can't generate extract function for " ++ show bfields
+  go atypeCons btypeCons [] [] = maybeToList $ buildSetClause f targets atypeCons btypeCons (groupByType bfields)
+  go atypeCons btypeCons (agroup:agroups) bgroups = do -- []
+    acons <- groupByCons agroup
+    go (acons:atypeCons) (btypeCons) agroups bgroups
+  go atypeCons btypeCons [] (bgroup:bgroups) = do -- []
+    bcons <- groupByCons bgroup
+    go atypeCons (bcons:btypeCons) [] bgroups
+  in go [] [] agroups  bgroups
+
+buildSetClause :: (FieldDesc -> [FieldDesc]) -> [String] -> [GroupedByCons] -> [GroupedByCons] -> [GroupedByType] -> Maybe Clause
+buildSetClause f names agroups bgroups btypes =  let
+  apats = [ConP (mkName cname) (fieldPats fields)  | (GroupedByCons mname cname fields) <- agroups]
+  bpats = [ConP (mkName cname) (fieldPats fields)  | (GroupedByCons mname cname fields) <- bgroups]
+  fieldPats fields = map fieldPat fields
+  fieldPat field = case f field of
+    _ -> VarP (_fdPatName field)
+    -- [] -> WildP
+
+  fields = concat [ fields | (GroupedByCons _ _ fields) <- agroups ]
+  bfields = concat [ fields | (GroupedByCons _ _ fields) <- bgroups ]
+  fieldAssoc = Map.fromList [ (_fdPatName new, _fdPatName field)
+                            | (news, field) <- zip (map f fields) fields
+                            , new <- news 
+                            ]
+
+  -- fallback to a values if 
+  fieldAssoc' = Map.fromList [ (_fdPatName field, _fdPatName field)
+                            | (field) <- bfields
+                            ]
+  body = TupE (map (consBody (fieldAssoc `Map.union` fieldAssoc')) btypes)
+  patFor pats = TupP pats
+  -- in traceShowId $ Just $ Clause (map ParensP pats) (NormalB body) []
+  result = Clause [patFor bpats, patFor apats]  (NormalB body) []
+  in traceShow ("apats", apats, "bpats", bpats, "fieldAssoc", fieldAssoc, "fieldAssoc'", fields) (Just result)
+
+-- * type classes
 class ExtractF a f b where
   extractF ::a -> f b
 

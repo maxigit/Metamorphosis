@@ -34,10 +34,21 @@ $(metamorphosis'
    [''Product] ["Style"]
  )
 
+$(generateSet
+   ( (\fd -> if fd ^. fdFName `elem` map Just ["variation", "quantity"]
+             then []
+             else [fd])
+   . (fdTName .~ "Style")
+   . (fdCName .~ "Style")
+   . (fdPos %~ min 2)
+   )
+   [''Product] [''Style]
+  "styleInProductA"
+ )
 deriving instance Show Style
 deriving instance Eq Style
 productToStyle = runIdentity . productToStyleA
-styleInProduct = undefined
+styleInProduct a b = runIdentity $ styleInProductA a b
 
  
 styleSpecs = 
@@ -45,7 +56,7 @@ styleSpecs =
     it "gets from a p" $ do
       productToStyle p `shouldBe` (Style "style" 15.50)
     it "sets to a p" $ do
-      styleInProduct (Style "new" 7) p `shouldBe` (Product "new" "var" 7.0 2)
+      styleInProduct p (Style "new" 7) `shouldBe` (Product "new" "var" 7.0 2)
 
 -- | Generates ProductF type
 -- data ProductF f = ProductF { style :: f String
@@ -91,6 +102,17 @@ $(metamorphosis'
    )
    [''Product] ["ProductM"]
  )
+$(generateSet
+   ( return
+   . (fdTName .~ "ProductM")
+   . (fdCName .~ "ProductM")
+   . (\fd -> if fd ^. fdFName == Just "price"
+                        then fdTypes %~ ("[]" : ) $ fd
+                        else fdTypes %~ id $ fd )
+   )
+   [''Product] [''ProductM]
+   "productMInProductA"
+ )
 deriving instance Show ProductM 
 deriving instance Eq ProductM 
 
@@ -103,6 +125,10 @@ productMSpecs =
       productToProductM p `shouldBe` (ProductM "style" "var" [15.50] 2)
     it "extracts from a productM" $ do
       productFToProductA (productToProductF p) `shouldBe` Just p
+    it "inject into a productM" $ do
+      productMInProductA p (ProductM "m" "var" [1,2] 3) `shouldBe` [ (Product "m" "var" 1 3)
+                                                                   , (Product "m" "var" 2 3)
+                                                                   ]
   
 -- * 
 -- Using two functors parameter we can get different responses
