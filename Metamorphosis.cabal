@@ -25,6 +25,9 @@ library
     , microlens
     , microlens-th
   exposed-modules:
+      Metamorphosis
+      Metamorphosis.TH
+      Metamorphosis.Types
       Sandbox
   default-language: Haskell2010
 
