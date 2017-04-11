@@ -16,19 +16,19 @@ library:
 
 tests:
   spec:
-    main : "Spec.hs"
+    main : Spec.hs
     source-dirs:
-      - src
       - test
 
     dependencies:
+      - Metamorphosis
       - hspec >= 2.1.8
       - doctest
       - lens
 
 executables:
   examples:
-    main: "Examples.hs"
+    main: Examples.hs
     source-dirs: examples
     dependencies:
     - lens
