@@ -6,3 +6,5 @@ To replace _oldField by _newField or oldField -> newField
 - [X] Refactors field lookup
 - [X] generates backward function from function + Inputs
 Not needed. We just use PatName instead.
+- [X] add AB,CD -> ABCD specs
+- [X] add ABCD -> (AB, CB) pecs

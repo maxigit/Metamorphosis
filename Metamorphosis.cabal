@@ -58,6 +58,7 @@ test-suite spec
     , doctest
     , lens
   other-modules:
+      MergeRecordsSpec
       PointSpec
       RecordSpec
   default-language: Haskell2010

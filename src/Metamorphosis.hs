@@ -6,7 +6,7 @@ module Metamorphosis where
 import           Control.Monad
 import           Data.Char
 import           Data.Function (on)
-import           Data.List (sort, nub, group, groupBy)
+import           Data.List (sort, nub, group, groupBy, intercalate)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe
@@ -124,6 +124,7 @@ generateType group@(GroupedByType mName tName fields) = let
   in DataD [] (mkName tName) vars Nothing (map generateCons cons) []
 
 -- | Generates the constructor clause of type given a (grouped) list of FieldDesc.
+-- example: (A a b)
 generateCons :: GroupedByCons -> Con
 generateCons (GroupedByCons mName cName fields) = let
   sorted = sort fields -- sort by position
@@ -339,7 +340,7 @@ extractName ins outs = aggregateNames ins ++ "To" ++ capitalize (aggregateNames 
 
 
 aggregateNames :: [String] -> String
-aggregateNames names = uncapitalize $ concatMap (capitalize) names
+aggregateNames names = uncapitalize $ intercalate "'" (map (capitalize) names)
 
   
 -- * Generate Set
