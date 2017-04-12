@@ -64,6 +64,7 @@ test-suite spec
     , doctest
     , lens
   other-modules:
+      InternalSpec
       MergeRecordsSpec
       PointSpec
       RecordSpec

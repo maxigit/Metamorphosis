@@ -2,13 +2,15 @@
 -- and doesn't need Template Haskell
 module Metamorphosis.Internal
 ( fieldsToTypes
+, applyFieldMapping
+, reverseTypeDescs
 , module Metamorphosis.Types
 )
 where
 
 import Lens.Micro
 import Data.Function (on)
-import Data.List (sort, nub, group, groupBy, intercalate)
+import Data.List (sort, nub, nubBy, group, groupBy, intercalate)
 import Metamorphosis.Types
 import qualified Data.Map as Map
 import Data.Map(Map)
@@ -16,7 +18,7 @@ import Data.Map(Map)
 -- | Structure Field Descriptions to types
 fieldsToTypes :: [FieldDesc] -> [TypeDesc]
 fieldsToTypes fds = let
-  sorted = nub $ sort fds -- by type, constructor, pos
+  sorted = nubBy ((==) `on` _fdKey) $ sort fds -- by type, constructor, pos
   groups = groupBy ((==) `on` _fdType) sorted
   mkType fields@(fd:_) = let typeD = TypeDesc (_fdTypeName fd)
                                  (_fdModuleName fd)
@@ -28,7 +30,7 @@ fieldsToTypes fds = let
 -- | Create ConsDesc from a list of FieldDesc belonging to the same type.
 fieldsToConss :: TypeDesc -> [FieldDesc] -> [ConsDesc]
 fieldsToConss typD fds = let
-  sorted = nub $ sort fds -- by type, constructor, pos
+  sorted = nubBy ((==) `on` _fdKey) $ sort fds -- by type, constructor, pos
   groups = groupBy ((==) `on` _fdConsName) sorted
   mkCons fields@(fd:_) = let consD = ConsDesc (_fdConsName fd)
                                               typD

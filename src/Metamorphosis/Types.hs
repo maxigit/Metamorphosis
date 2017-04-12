@@ -4,6 +4,7 @@ module Metamorphosis.Types where
 import Control.Applicative
 import Control.Monad
 import Language.Haskell.TH.Syntax
+import Data.List (intercalate)
 import Lens.Micro
 import Lens.Micro.TH
 
@@ -27,6 +28,14 @@ data FieldDesc = FieldDesc
   } deriving (Show, Eq, Ord)
 
 makeLenses ''FieldDesc
+
+-- | Create a field, mainly for testing purpose.
+mkField :: String -> Int -> [Char] -> String -> FieldDesc
+mkField cname pos fname types =
+  FieldDesc cname cname pos (toMaybe fname) bang (words types) Nothing
+  where bang = (Bang NoSourceUnpackedness NoSourceStrictness)
+        toMaybe "" = Nothing
+        toMaybe s = Just s
 
 -- | Traversal to set both name at the same time
 fdTConsName  :: Traversal' FieldDesc String
@@ -55,19 +64,44 @@ data TypeDesc = TypeDesc { _tdName :: TypeName
 _tdFields typD = concatMap (_cdFields) (_tdCons typD)
 tdFields = to _tdFields
 
+_tdFullName td = maybe "" (++".") (_tdModuleName td) ++ _tdName td
+
 -- Denormalized description of a data constructor.
 -- All field are supposed to have their type an cons field set correctly
+-- As it's cyclic structure it can't be shown properly.
 data  ConsDesc = ConsDesc { _cdName :: ConsName
                           , _cdTypeDesc :: TypeDesc
                           , _cdFields :: [FieldDescPlus]
-                          } deriving (Show, Eq, Ord)
+                          }
+
+
+-- | ConsDesc can be cyclic, so we need a non-cyclic version
+-- to be able to instantiate Ord, Eq and Show
+consDescToTuple cd = ("ConsDesc", _cdFullName cd, map fieldDescPlusToTuple (_cdFields cd))
+
+instance Show ConsDesc where show = show . consDescToTuple
+instance Eq ConsDesc where  a== b = consDescToTuple a == consDescToTuple b
+instance Ord ConsDesc where  compare a  b = compare (consDescToTuple a) (consDescToTuple b)
+
+_cdFullName cd = _tdFullName (_cdTypeDesc cd) ++ "#" ++ _cdName cd
 
 -- | FieldDesc + internal information
+-- As it's cyclic structure it can't be shown properly.
+-- We define a fake Show instance which doesn't display cycles
 data FieldDescPlus = FieldDescPlus { _fpField :: FieldDesc
                                    , _fpCons :: ConsDesc
                                    , _fpSources :: [FieldDescPlus]
-                                   } deriving (Show, Eq, Ord)
+                                   }
 
+fieldDescPlusToTuple fp = ( "FieldDescPlus"
+                      , show (_fpField fp)
+                      , _cdFullName (_fpCons fp)
+                      , show (map show $ _fpSources fp)
+                      )
+instance Show FieldDescPlus where show = show . fieldDescPlusToTuple
+instance Eq FieldDescPlus where  a== b = fieldDescPlusToTuple a == fieldDescPlusToTuple b
+instance Ord FieldDescPlus where  compare a  b = compare (fieldDescPlusToTuple a) (fieldDescPlusToTuple b)
+                             
 _fpKey :: FieldDescPlus -> FieldKey
 _fpKey = _fdKey . _fpField
 makeLenses ''TypeDesc
