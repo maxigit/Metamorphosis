@@ -2,10 +2,8 @@
 module Metamorphosis.TH where
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
-import           Data.List (sort, nub, group, groupBy, intercalate)
-import           Data.Function (on)
 
-import Metamorphosis.Types
+import Metamorphosis.Internal
 
 
 -- | Retrieves the field descriptions of data type (from its Info)
@@ -38,30 +36,12 @@ collectFields (TyConI (DataD cxt tName vars kind cons cxt')) = concatMap go cons
   go'' cName (fName, bang, typ) pos = (go' cName (bang, typ) pos) {_fdFieldName = Just (nameBase fName)}
 collectFields info = error $ "collectFields only works with type declaration." ++ show ( ppr info )
 
--- | Structure Field Descriptions to types
-fieldsToTypes :: [FieldDesc] -> [TypeDesc]
-fieldsToTypes fds = let
-  sorted = sort fds -- by type, constructor, pos
-  groups = groupBy ((==) `on` _fdType) sorted
-  mkType fields@(fd:_) = let typeD = TypeDesc (_fdTypeName fd)
-                                 (_fdModuleName fd)
-                                 (fieldsToConss typeD fields)
-                         in typeD
-  in map mkType groups
+collectTypes :: [Name] -> Q [TypeDesc]
+collectTypes names = do
+  infos <- mapM reify names
+  let fields = concatMap collectFields infos
+  return $ fieldsToTypes fields
 
-
-fieldsToConss :: TypeDesc -> [FieldDesc] -> [ConsDesc]
-fieldsToConss typD fds = let
-  sorted = sort fds -- by type, constructor, pos
-  groups = groupBy ((==) `on` _fdConsName) sorted
-  mkCons fields@(fd:_) = let consD = ConsDesc (_fdConsName fd)
-                                              typD
-                                              ( zipWith3 FieldDescPlus (sort fields)
-                                                                       (repeat consD)
-                                                                       (repeat [])
-                                              )
-                         in consD
-  in map mkCons groups
 
 -- | Converts a type (AST) to a list of String (chain)
 -- ex: Maybe Int -> ["Maybe", "Int"]

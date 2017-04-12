@@ -26,6 +26,7 @@ library
     , microlens-th
   exposed-modules:
       Metamorphosis
+      Metamorphosis.Internal
       Metamorphosis.TH
       Metamorphosis.Types
       Sandbox
