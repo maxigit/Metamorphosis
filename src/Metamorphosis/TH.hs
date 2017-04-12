@@ -43,18 +43,24 @@ fieldsToTypes :: [FieldDesc] -> [TypeDesc]
 fieldsToTypes fds = let
   sorted = sort fds -- by type, constructor, pos
   groups = groupBy ((==) `on` _fdType) sorted
-  mkType fields@(fd:_) = TypeDesc (_fdTypeName fd)
+  mkType fields@(fd:_) = let typeD = TypeDesc (_fdTypeName fd)
                                  (_fdModuleName fd)
-                                 (fieldsToConss fields)
+                                 (fieldsToConss typeD fields)
+                         in typeD
   in map mkType groups
 
 
-fieldsToConss :: [FieldDesc] -> [ConsDesc]
-fieldsToConss fds = let
+fieldsToConss :: TypeDesc -> [FieldDesc] -> [ConsDesc]
+fieldsToConss typD fds = let
   sorted = sort fds -- by type, constructor, pos
   groups = groupBy ((==) `on` _fdConsName) sorted
-  mkCons fields@(fd:_) = ConsDesc (_fdConsName fd)
-                                 (sort fields)
+  mkCons fields@(fd:_) = let consD = ConsDesc (_fdConsName fd)
+                                              typD
+                                              ( zipWith3 FieldDescPlus (sort fields)
+                                                                       (repeat consD)
+                                                                       (repeat [])
+                                              )
+                         in consD
   in map mkCons groups
 
 -- | Converts a type (AST) to a list of String (chain)

@@ -53,8 +53,14 @@ data TypeDesc = TypeDesc { _tdName :: TypeName
 -- Denormalized description of a data constructor.
 -- All field are supposed to have their type an cons field set correctly
 data  ConsDesc = ConsDesc { _cdName :: ConsName
-                          , _cdFields :: [FieldDesc]
+                          , _cdTypeDesc :: TypeDesc
+                          , _cdFields :: [FieldDescPlus]
                           } deriving (Show, Eq, Ord)
 
+-- | FieldDesc + internal information
+data FieldDescPlus = FieldDescPlus { _fpField :: FieldDesc
+                                   , _fpCons :: ConsDesc
+                                   , _fdSources :: [FieldDescPlus]
+                                   } deriving (Show, Eq, Ord)
 makeLenses ''TypeDesc
 makeLenses ''ConsDesc
