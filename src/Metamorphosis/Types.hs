@@ -94,9 +94,9 @@ data FieldDescPlus = FieldDescPlus { _fpField :: FieldDesc
                                    }
 
 fieldDescPlusToTuple fp = ( "FieldDescPlus"
-                      , show (_fpField fp)
+                      , _fpField fp
                       , _cdFullName (_fpCons fp)
-                      , show (map show $ _fpSources fp)
+                      , _fpSources fp
                       )
 instance Show FieldDescPlus where show = show . fieldDescPlusToTuple
 instance Eq FieldDescPlus where  a== b = fieldDescPlusToTuple a == fieldDescPlusToTuple b
