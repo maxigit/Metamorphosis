@@ -56,9 +56,14 @@ spec = do
       aFields ^.. each . fdTypeName `shouldBe` ["A", "A", "A", "A"]
       aFields ^.. each . fdConsName `shouldBe` ["A", "A", "Record", "Record"]
       aFields ^.. each . fdFieldName `shouldBe` [Nothing, Nothing, Just "style", Just "price"]
+
+  let aFields = collectFields  aInfo
+      [a] = fieldsToTypes aFields
+      aA = a ^?! tdCons . ix 0
+      aRecord = a ^?! tdCons . ix 1
+      [point] = fieldsToTypes (collectFields  pointInfo)
+      pPoint = point ^?! tdCons . ix 0
   describe "genConsBodyE" $ do
-    let aFields = collectFields  aInfo
-    let [a] = fieldsToTypes aFields
     it "uses () when field not found" $ do
       let body = genConsBodyE Map.empty (head $ a ^. tdCons)
       (show . ppr $ body) `shouldBe` "A () ()"
@@ -71,11 +76,6 @@ spec = do
       let body = genConsBodyE m ((a ^. tdCons) !! 0)
       (show . ppr $ body) `shouldBe` "A a1_0 a2_1"
   describe "genConsClause" $ do
-    let [a] = fieldsToTypes (collectFields  aInfo)
-        aA = a ^?! tdCons . ix 0
-        aRecord = a ^?! tdCons . ix 1
-    let [point] = fieldsToTypes (collectFields  pointInfo)
-        pPoint = point ^?! tdCons . ix 0
     it "generates copy for simple constructor" $ do
       genConsClause [[aA]] [aA] `shouldLookQ` "(A a1_0 a2_1) = (A a1_0 a2_1)"
     it "generates copy for record constructor" $ do
@@ -83,4 +83,6 @@ spec = do
     it "generates copy for of tuples" $ do
       genConsClause [[aRecord, pPoint]] [aRecord, pPoint]
         `shouldLookQ` "(Record style_0 price_1, Point x_2 y_3) = (Record style_0 price_1, Point x_2 y_3)"
+    it "generates wildcard for non used pattern" $ do
+      genConsClause [[aRecord]] [pPoint] `shouldLookQ` "(Record _ _) = Point () ()"
 
