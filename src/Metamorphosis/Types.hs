@@ -107,3 +107,10 @@ _fpKey = _fdKey . _fpField
 makeLenses ''TypeDesc
 makeLenses ''ConsDesc
 makeLenses ''FieldDescPlus
+-- | Defines how body constructor are generated.
+data BodyConsRules = BodyConsRules { bcrProcessCons :: Exp -> Exp
+                               , bcrProcessFields :: [Exp] -> Exp
+                               , bcrSeparator :: [Exp ->  Exp -> Exp]
+                               }
+
+makeLenses '' BodyConsRules

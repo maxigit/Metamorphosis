@@ -59,31 +59,65 @@ spec = do
 
   let aFields = collectFields  aInfo
       [a] = fieldsToTypes aFields
+      [a'] = applyFieldMapping (:[]) [a]
       aA = a ^?! tdCons . ix 0
       aRecord = a ^?! tdCons . ix 1
+      aA' = a' ^?! tdCons . ix 0
+      aRecord' = a' ^?! tdCons . ix 1
+
       [point] = fieldsToTypes (collectFields  pointInfo)
       pPoint = point ^?! tdCons . ix 0
+      [point'] = applyFieldMapping (:[]) [point]
+      pPoint' = point' ^?! tdCons . ix 0
+  
+
   describe "genConsBodyE" $ do
     it "uses () when field not found" $ do
-      let body = genConsBodyE Map.empty (head $ a ^. tdCons)
+      let body = genConsBodyE identityBCR Map.empty (head $ a ^. tdCons)
       (show . ppr $ body) `shouldBe` "A () ()"
+
     it "uses field name in the correct order" $ do
       m <- runQ (genNameMap $ a ^. tdCons . each . cdFields )
-      let body = genConsBodyE m ((a ^. tdCons) !! 1)
-      (show . ppr $ body) `shouldBe` "Record style_0 price_1"
+      let body = genConsBodyE identityBCR m ((a' ^. tdCons) !! 1)
+      (show . ppr $ body) `shouldBe` "Record (style_0) (price_1)"
+
     it "uses position in the correct order" $ do
       m <- runQ (genNameMap $ a ^. tdCons . each . cdFields )
-      let body = genConsBodyE m ((a ^. tdCons) !! 0)
-      (show . ppr $ body) `shouldBe` "A a1_0 a2_1"
+      let body = genConsBodyE identityBCR m ((a' ^. tdCons) !! 0)
+      (show . ppr $ body) `shouldBe` "A (a1_0) (a2_1)"
+  
+
   describe "genConsClause" $ do
+    let genCopy = genConsClause identityBCR
+
     it "generates copy for simple constructor" $ do
-      let aA' = aA  & cdFields . each %~ (\f -> f & fpSources .~ [f])
-      genConsClause [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (A (a1_0) (a2_1))"
+      genCopy [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (A (a1_0) (a2_1))"
+
     it "generates copy for record constructor" $ do
-      genConsClause [[aRecord]] [aRecord] `shouldLookQ` "(Record style_0 price_1) = (Record style_0 price_1)"
+      genCopy [[aRecord]] [aRecord'] `shouldLookQ` "(Record style_0 price_1) = (Record (style_0) (price_1))"
     it "generates copy for of tuples" $ do
-      genConsClause [[aRecord, pPoint]] [aRecord, pPoint]
-        `shouldLookQ` "(Record style_0 price_1, Point x_2 y_3) = (Record style_0 price_1, Point x_2 y_3)"
+      genCopy [[aRecord, pPoint]] [aRecord', pPoint']
+        `shouldLookQ` "(Record style_0 price_1, Point x_2 y_3) = (Record (style_0) (price_1), Point (x_2) (y_3))"
     it "generates wildcard for non used pattern" $ do
-      genConsClause [[aRecord]] [pPoint] `shouldLookQ` "(Record _ _) = Point () ()"
+      genCopy [[aRecord]] [pPoint] `shouldLookQ` "(Record _ _) = (Point () ())"
+
+    it "generates applicatives" $ do
+      genConsClause applicativeBCR [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (A <$> (a1_0) <*> (a2_1))"
+
+    it "generates to monoid" $ do
+      genConsClause (monoidBCR "return") [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (mempty <> (return a1_0) <> (return a2_1))"
+
+    it "generates to monoid with Pure" $ do
+      genConsClause (monoidPureBCR "show") [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (mempty <> ((pure . show) a1_0) <> ((pure . show) a2_1))"
+
+    it "generates extractor" $ do
+      genConsClause extractBCR [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (A <$> (extract a1_0) <*> (extract a2_1))"
+
+    it "use multiple constructors (tuples)" $ do
+       let f = ( return . (fdFieldName .~ (Just "P")) . (fdTConsName .~ "P"))
+           [p] = applyFieldMapping f [point]
+       genConsClause identityBCR [[pPoint]] (p ^. tdCons) `shouldLookQ` "(Point x_0 y_1) = (P (GHC.Tuple.(,) x_0 y_1))"
+
+       
+
 

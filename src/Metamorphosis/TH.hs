@@ -8,6 +8,7 @@ import Metamorphosis.Util
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Lens.Micro
+import Data.List(sort)
 
 
 -- | Retrieves the field descriptions of data type (from its Info)
@@ -81,14 +82,14 @@ conssToTuplePat fieldToName consDescs = let
 
 -- | Generates a constructor clause of the form
 -- (A a) (XY x y) = (f AXZ  (g a) (g x), f Y (g y)
-genConsClause :: [[ConsDesc]] -> [ConsDesc] -> Q Clause
-genConsClause sources targets = do
+genConsClause :: BodyConsRules -> [[ConsDesc]] -> [ConsDesc] -> Q Clause
+genConsClause rules sources targets = do
   fieldToName <- genNameMap  (sources ^. each . each . cdFields )
   -- filter constructor which are actually not used
   let used = targets ^. each . cdFields . each  . fpSources
   let fieldToName0 = Map.filterWithKey (\f n -> f `elem` used) fieldToName
       pats = map (conssToTuplePat fieldToName0) sources
-      body = TupE (map (genConsBodyE  fieldToName) targets)
+      body = TupE (map (genConsBodyE rules fieldToName) targets)
   return $  Clause pats (NormalB body) []
 
 
@@ -106,15 +107,41 @@ genName fp = newName $ case (fp ^. fpField . fdFieldName) of
     Nothing -> uncapitalize $ fp ^. fpCons . cdName ++ show (fp ^. fpField . fdPos)
     Just name -> name
 
-genConsBodyE :: Map FieldDescPlus Name -> ConsDesc -> Exp
-genConsBodyE fieldToName consDesc = let
-  cons =  ConE (mkName $ consDesc ^. cdName)
+ -- | Generates a call to a constructor
+-- ex: (consF A <op> fieldF a <op> fieldF b)
+genConsBodyE :: BodyConsRules -> Map FieldDescPlus Name -> ConsDesc -> Exp
+genConsBodyE (BodyConsRules consF fieldsF opFs) fieldToName consDesc = let
+  cons = consF $  ConE (mkName $ consDesc ^. cdName)
   fieldEs = map fieldToE (consDesc ^. cdFields)
   fieldToE fp = let
-    sources = fp ^. fpSources
+    sources = sort $ fp ^. fpSources
     vars = map (\f -> maybe (TupE []) VarE (Map.lookup f fieldToName)) sources
-    in TupE vars
-  in foldl AppE cons fieldEs
+    in fieldsF vars
+  in foldl (\m (exp, op) -> m `op` exp )cons (zip fieldEs opFs)
 
 
+-- ** Default body constructor rules
+fieldsToTuples = go where
+  go [] = TupE []
+  go [f] = ParensE $ f 
+  go fs = foldl AppE (VarE $ tupleDataName (length fs)) fs
+
+fieldsToTuples' name fs = fieldsToTuples'' (VarE $ mkName name) fs
+fieldsToTuples'' expr fs = fieldsToTuples $ map (expr `AppE`) fs
+opToFunction op a b= UInfixE a (VarE $ mkName op) b
+identityBCR = BodyConsRules id fieldsToTuples (repeat AppE)
+applicativeBCR = BodyConsRules id fieldsToTuples (map opToFunction $ "<$>":repeat "<*>")
+extractBCR = BodyConsRules id (fieldsToTuples' "extract") (map opToFunction $ "<$>":repeat "<*>")
+monoidBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
+                            (fieldsToTuples' f)
+                            (map opToFunction $ repeat "<>")
+monoidPureBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
+                            (fieldsToTuples'' (ParensE $ UInfixE (VarE $ mkName "pure")
+                                                                 (VarE $ mkName ".")
+                                                                 (VarE $ mkName f)
+                                              )
+                            )
+                            (map opToFunction $ repeat "<>")
+
+                
 
