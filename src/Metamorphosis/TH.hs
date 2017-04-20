@@ -84,8 +84,11 @@ conssToTuplePat fieldToName consDescs = let
 genConsClause :: [[ConsDesc]] -> [ConsDesc] -> Q Clause
 genConsClause sources targets = do
   fieldToName <- genNameMap  (sources ^. each . each . cdFields )
-  let pats = map (conssToTuplePat fieldToName) sources
-  let body = TupE (map (genConsBodyE  fieldToName) targets)
+  -- filter constructor which are actually not used
+  let used = targets ^. each . cdFields . each  . fpSources
+  let fieldToName0 = Map.filterWithKey (\f n -> f `elem` used) fieldToName
+      pats = map (conssToTuplePat fieldToName0) sources
+      body = TupE (map (genConsBodyE  fieldToName) targets)
   return $  Clause pats (NormalB body) []
 
 
@@ -107,7 +110,10 @@ genConsBodyE :: Map FieldDescPlus Name -> ConsDesc -> Exp
 genConsBodyE fieldToName consDesc = let
   cons =  ConE (mkName $ consDesc ^. cdName)
   fieldEs = map fieldToE (consDesc ^. cdFields)
-  fieldToE fp = maybe (TupE []) VarE (Map.lookup fp fieldToName)
+  fieldToE fp = let
+    sources = fp ^. fpSources
+    vars = map (\f -> maybe (TupE []) VarE (Map.lookup f fieldToName)) sources
+    in TupE vars
   in foldl AppE cons fieldEs
 
 

@@ -77,7 +77,8 @@ spec = do
       (show . ppr $ body) `shouldBe` "A a1_0 a2_1"
   describe "genConsClause" $ do
     it "generates copy for simple constructor" $ do
-      genConsClause [[aA]] [aA] `shouldLookQ` "(A a1_0 a2_1) = (A a1_0 a2_1)"
+      let aA' = aA  & cdFields . each %~ (\f -> f & fpSources .~ [f])
+      genConsClause [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (A (a1_0) (a2_1))"
     it "generates copy for record constructor" $ do
       genConsClause [[aRecord]] [aRecord] `shouldLookQ` "(Record style_0 price_1) = (Record style_0 price_1)"
     it "generates copy for of tuples" $ do
