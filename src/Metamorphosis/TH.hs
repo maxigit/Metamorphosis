@@ -4,6 +4,7 @@ import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
 
 import Metamorphosis.Internal
+import Metamorphosis.Util
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Lens.Micro
@@ -99,7 +100,7 @@ genNameMap fields = do
 
 genName :: FieldDescPlus -> Q Name
 genName fp = newName $ case (fp ^. fpField . fdFieldName) of
-    Nothing -> fp ^. fpCons . cdName ++ show (fp ^. fpField . fdPos)
+    Nothing -> uncapitalize $ fp ^. fpCons . cdName ++ show (fp ^. fpField . fdPos)
     Just name -> name
 
 genConsBodyE :: Map FieldDescPlus Name -> ConsDesc -> Exp

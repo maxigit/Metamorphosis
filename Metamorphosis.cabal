@@ -29,6 +29,7 @@ library
       Metamorphosis.Internal
       Metamorphosis.TH
       Metamorphosis.Types
+      Metamorphosis.Util
       Sandbox
   default-language: Haskell2010
 

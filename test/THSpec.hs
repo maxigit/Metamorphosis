@@ -6,6 +6,10 @@ import Metamorphosis.Types
 import Test.Hspec
 import Lens.Micro
 import Language.Haskell.TH
+import Metamorphosis.Internal
+import qualified Data.Map as Map
+import Data.Char(isSpace)
+import Data.List(group)
 
 data A = A Int String | Record { style :: String , price :: Double} deriving Show
 aInfo = TyConI (DataD []
@@ -19,9 +23,30 @@ aInfo = TyConI (DataD []
                                                 , ((mkName "price"),Bang NoSourceUnpackedness NoSourceStrictness,ConT (mkName "Double"))
                                                 ]
                        ]
-          [ConT (mkName "Show")]
-        )
+               [ConT (mkName "Show")]
+               )
+data Point a = Point { x :: a, y :: a } deriving Show
+pointInfo = TyConI (DataD []
+                   (mkName "Point")
+                   []
+                   Nothing [ RecC (mkName "Point") [ ((mkName "x") ,Bang NoSourceUnpackedness NoSourceStrictness,ConT (mkName "a"))
+                                                   , ((mkName "y"),Bang NoSourceUnpackedness NoSourceStrictness,ConT (mkName "a"))
+                                                   ]
+                           ]
+                   [ConT (mkName "Show")]
+                   )
 
+shouldLook expr expected = sanitize (show $ ppr expr) `shouldBe` sanitize expected
+  where sanitize str = let
+          spc = map (\c -> if isSpace c then ' ' else c)  str
+          groups = group spc
+          strip (' ':_) = " "
+          strip s = s
+          in concatMap strip groups
+shouldLookQ q expected = do
+  expr <- runQ q
+  expr `shouldLook` expected
+  
 
 spec :: Spec
 spec = do
@@ -31,3 +56,31 @@ spec = do
       aFields ^.. each . fdTypeName `shouldBe` ["A", "A", "A", "A"]
       aFields ^.. each . fdConsName `shouldBe` ["A", "A", "Record", "Record"]
       aFields ^.. each . fdFieldName `shouldBe` [Nothing, Nothing, Just "style", Just "price"]
+  describe "genConsBodyE" $ do
+    let aFields = collectFields  aInfo
+    let [a] = fieldsToTypes aFields
+    it "uses () when field not found" $ do
+      let body = genConsBodyE Map.empty (head $ a ^. tdCons)
+      (show . ppr $ body) `shouldBe` "A () ()"
+    it "uses field name in the correct order" $ do
+      m <- runQ (genNameMap $ a ^. tdCons . each . cdFields )
+      let body = genConsBodyE m ((a ^. tdCons) !! 1)
+      (show . ppr $ body) `shouldBe` "Record style_0 price_1"
+    it "uses position in the correct order" $ do
+      m <- runQ (genNameMap $ a ^. tdCons . each . cdFields )
+      let body = genConsBodyE m ((a ^. tdCons) !! 0)
+      (show . ppr $ body) `shouldBe` "A a1_0 a2_1"
+  describe "genConsClause" $ do
+    let [a] = fieldsToTypes (collectFields  aInfo)
+        aA = a ^?! tdCons . ix 0
+        aRecord = a ^?! tdCons . ix 1
+    let [point] = fieldsToTypes (collectFields  pointInfo)
+        pPoint = point ^?! tdCons . ix 0
+    it "generates copy for simple constructor" $ do
+      genConsClause [[aA]] [aA] `shouldLookQ` "(A a1_0 a2_1) = (A a1_0 a2_1)"
+    it "generates copy for record constructor" $ do
+      genConsClause [[aRecord]] [aRecord] `shouldLookQ` "(Record style_0 price_1) = (Record style_0 price_1)"
+    it "generates copy for of tuples" $ do
+      genConsClause [[aRecord, pPoint]] [aRecord, pPoint]
+        `shouldLookQ` "(Record style_0 price_1, Point x_2 y_3) = (Record style_0 price_1, Point x_2 y_3)"
+
