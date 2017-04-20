@@ -67,8 +67,8 @@ spec = do
     it "has 4 fields" $ do
       length (cT ^.. each . tdCons . each . cdFields . each) `shouldBe` 4
     it "has all original fields as sources" $ do
-      (cT ^.. each . tdCons . each . cdFields . each . fpSources . each)
-        `shouldBe` (fieldDescs ^.. each . tdCons . each .cdFields . each)
+      sort (cT ^.. each . tdCons . each . cdFields . each . fpSources . each)
+        `shouldBe` sort (fieldDescs ^.. each . tdCons . each .cdFields . each)
 
   
 

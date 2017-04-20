@@ -89,3 +89,27 @@ reverseTypeDescs typDs = let
   
 
   
+
+-- | Find types needed to create a tuple of given types
+-- Example if Data AB = AB A B and data XY = XY X Y
+-- we can create (AB, X) from ()AB , XY
+typeSources :: [TypeDesc] -> [TypeDesc]
+typeSources tds = let
+  sources = tds ^.. each . tdCons . each . cdFields . each .fpSources . each
+  types = sources  ^.. each . fpCons . cdTypeDesc
+  in nub . sort  $ types
+
+
+
+-- | Only keep sources belonging to the list of types to keep
+filterSourceByTypes :: [TypeDesc] -> [TypeDesc] -> [TypeDesc]
+filterSourceByTypes  typesToKeep types =
+  each . tdCons . each . cdFields . each . fpSources %~ (filter keep) $ types
+  where keep  fd = fd ^. fpCons . cdTypeDesc `elem` types
+
+filterByTypes :: [TypeDesc] -> [TypeDesc] -> [TypeDesc]
+filterByTypes typesToKeep types = filter (`elem` typesToKeep) types
+
+-- | Keeps types having one of the given constructors.
+filterByCons :: [ConsDesc] -> [TypeDesc] -> [TypeDesc]
+filterByCons consToKeep types = filter (\t -> any (`elem` consToKeep) (_tdCons t)) types
