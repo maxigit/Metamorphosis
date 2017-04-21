@@ -3,7 +3,9 @@
 {-# LANGUAGE QuasiQuotes, TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 module Metamorphosis
-(
+( metamorphosis
+, identityBCR
+, module Metamorphosis.Types
 ) where
 
 import Metamorphosis.Applicative
@@ -14,16 +16,18 @@ import Language.Haskell.TH
 import Data.Maybe
 import Data.List(subsequences)
 import Lens.Micro
+import Debug.Trace
 
 metamorphosis :: BodyConsRules
               -> (FieldDesc -> [FieldDesc])
               -> [Name]
-              -> (String -> Maybe String)
+              -> (String -> Bool)
+              -> (String -> [Name])
               -> Q [Dec]
-metamorphosis rules f sources filter = do
+metamorphosis rules f sources filter deriv = do
   sourceTypes <- collectTypes sources
   let targetTypes = applyFieldMapping f sourceTypes
-      typeDecls = map (generateType []) targetTypes
+      typeDecls = map (\t -> generateType (t ^. tdName . to deriv) t) targetTypes
 
       sourceTypes' = reverseTypeDescs targetTypes
 
@@ -36,16 +40,21 @@ metamorphosis rules f sources filter = do
 -- | Generates all possible converter between different classes
 -- We generate all possible combinations and filter the name 
 genConverters :: BodyConsRules
-              -> (String -> Maybe String)
+              -> (String -> Bool)
               ->  [TypeDesc] -> Q [Dec]
 genConverters rules filter targets = do
-  let sources =  typeSources targets
-      combinations :: [(String, [TypeDesc], [TypeDesc])]
-      combinations = catMaybes
-        [ (, srcs, tgts) `fmap` newName
-        | srcs <- subsequences sources
-        , tgts <- subsequences targets
-        , let name = (rules ^. bcrFunName) [srcs ^.. each . tdName] (tgts ^.. each . tdName)
-        , let newName = filter name
+  let -- sources =  typeSources targets
+      subsequences' = (Prelude.filter (not  . null)) . subsequences
+      combinations :: [(String, [[TypeDesc]], [TypeDesc])]
+      combinations = 
+        [ (name, srcs', tgts)
+        -- | srcs <- subsequences' sources
+        | tgts <- subsequences' targets
+        , let sources = typeSources tgts
+        , srcs <- subsequences' sources
+        , tgts' <- [[], [tgts]] -- add target to sources to get setter
+        , let srcs' = tgts' ++ [srcs]  :: [[TypeDesc]]
+        , let name = traceShowId $ (rules ^. bcrFunName) (map (map _tdName) srcs') (tgts ^.. each . tdName)
+        , filter name
         ]
-  mapM (\(name, srcs, tgts) -> genConversion rules [srcs] tgts) combinations
+  mapM (\(name, srcs, tgts) -> genConversion rules srcs tgts) combinations

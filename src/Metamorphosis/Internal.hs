@@ -72,7 +72,7 @@ applyFieldMapping fieldMapping typDs = let
 -- | Extract the sources and recompute the source
 -- so they point to the original target.
 -- It should be equivalent to applying the inverse of a fieldMapping to types
--- (which were target when calling applyingFieldMapping)
+-- (which where target when calling applyingFieldMapping)
 -- prop  rev.rev = id
 reverseTypeDescs :: [TypeDesc] -> [TypeDesc]
 reverseTypeDescs typDs = let

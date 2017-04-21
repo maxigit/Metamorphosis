@@ -196,7 +196,7 @@ generateType derivs typ = let
   cons =  typ ^. tdCons
   fields = typ ^.. tdCons . each . cdFields  . each . fpField
   varTypes = nub $ sort (concatMap _fdVarTypes fields)
-  in DataD [] (mkName $ typ ^. tdName) varTypes Nothing (map generateCons cons) (map VarT derivs)
+  in DataD [] (mkName $ typ ^. tdName) varTypes Nothing (map generateCons cons) (map ConT derivs)
 
 -- | Generates a Constructor declaration
 generateCons :: ConsDesc -> Con

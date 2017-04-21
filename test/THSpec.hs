@@ -130,7 +130,6 @@ spec = do
         \iAToA (Record style_2 price_3) = (Record (style_2) (price_3))"
 
   describe "generateType" $ do
-
     it "generates complex type" $ do
       generateType [''Show] a `shouldLook`
         "data A = A Int String | Record {style :: String, price :: Double} deriving GHC.Show.Show"
