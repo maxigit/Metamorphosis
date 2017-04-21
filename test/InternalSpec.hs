@@ -10,6 +10,7 @@ import Data.List (sort)
 import Test.Hspec
 import Lens.Micro
 
+(<$$$>) = map . map . map
 fields@[a1, a2, b1, b2] = [ mkField  "A" 1 "quantity" "Int"
                           , mkField  "A" 2 "name" "String"
                           , mkField  "B" 1 "quantity'" "Maybe Int"
@@ -28,6 +29,28 @@ bT = TypeDesc "B"
                                          , FieldDescPlus b2 bC []
                                          ]
                 in bC
+              ]            
+abT = TypeDesc "AB"
+              Nothing
+              [ let abaC = ConsDesc "ABA" abT [ FieldDescPlus b1 abaC []
+                                              , FieldDescPlus b2 abaC []
+                                              ]
+                in abaC
+              , let abbC = ConsDesc "ABB" abT [ FieldDescPlus b1 abbC []
+                                              , FieldDescPlus b2 abbC []
+                                              ]
+                in abbC
+              ]            
+xyT = TypeDesc "XY"
+              Nothing
+              [ let xyxC = ConsDesc "XYX" xyT [ FieldDescPlus b1 xyxC []
+                                              , FieldDescPlus b2 xyxC []
+                                              ]
+                in xyxC
+              , let xyyC = ConsDesc "XYX" xyT [ FieldDescPlus b1 xyyC []
+                                              , FieldDescPlus b2 xyyC []
+                                              ]
+                in xyyC
               ]            
 
 tdField cons field = tdCons . ix cons . cdFields . ix field
@@ -69,6 +92,24 @@ spec = do
     it "has all original fields as sources" $ do
       sort (cT ^.. each . tdCons . each . cdFields . each . fpSources . each)
         `shouldBe` sort (fieldDescs ^.. each . tdCons . each .cdFields . each)
+  describe "consCombinations" $ do
+    it "combines like tuples" $ do
+      (_cdName <$$$> consCombinations [[aT, xyT]])
+        `shouldBe` [ [["A", "XYX"]]
+                   , [["B", "XYY"]]
+                   ]
+    it "combines like argument" $ do
+      (_cdName <$$$> consCombinations [[aT], [xyT]])
+        `shouldBe` [ [["A"], ["XYX"]]
+                   , [["B"], ["XYY"]]
+                   ]
+  it "combines everything" $ do
+      (_cdName <$$$> consCombinations [[xyT], [abT, bT]])
+        `shouldBe` [ [["XYX"] , ["ABA", "B"]]
+                   , [["XYY"] , ["ABA", "B"]]
+                   , [["XYX"] , ["ABB", "B"]]
+                   , [["XYY"] , ["ABB", "B"]]
+                   ]
 
   
 

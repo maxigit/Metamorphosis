@@ -8,7 +8,8 @@ import Metamorphosis.Util
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Lens.Micro
-import Data.List(sort)
+import Data.List(sort, intercalate)
+import Control.Monad(zipWithM)
 
 
 -- | Retrieves the field descriptions of data type (from its Info)
@@ -110,7 +111,7 @@ genName fp = newName $ case (fp ^. fpField . fdFieldName) of
  -- | Generates a call to a constructor
 -- ex: (consF A <op> fieldF a <op> fieldF b)
 genConsBodyE :: BodyConsRules -> Map FieldDescPlus Name -> ConsDesc -> Exp
-genConsBodyE (BodyConsRules consF fieldsF opFs) fieldToName consDesc = let
+genConsBodyE (BodyConsRules consF fieldsF opFs _) fieldToName consDesc = let
   cons = consF $  ConE (mkName $ consDesc ^. cdName)
   fieldEs = map fieldToE (consDesc ^. cdFields)
   fieldToE fp = let
@@ -120,21 +121,47 @@ genConsBodyE (BodyConsRules consF fieldsF opFs) fieldToName consDesc = let
   in foldl (\m (exp, op) -> m `op` exp )cons (zip fieldEs opFs)
 
 
+-- | Generates a conversion between a set of tuples types to a set of types
+genConversion :: BodyConsRules -> [[TypeDesc]] -> [TypeDesc] -> Q Dec
+genConversion rules sourcess targets = do
+  let fname = _bcrFunName rules (map (map _tdName) sourcess) (map _tdName targets)
+      consSources = consCombinations sourcess
+      bestTargetsCons = map (bestConstructorFor targets) consSources
+  clauses  <- zipWithM (genConsClause rules) consSources bestTargetsCons
+  return $ FunD (mkName fname) clauses
+
+
+
 -- ** Default body constructor rules
+fieldsToTuples :: [Exp] -> Exp
 fieldsToTuples = go where
   go [] = TupE []
   go [f] = ParensE $ f 
   go fs = foldl AppE (VarE $ tupleDataName (length fs)) fs
 
+fieldsToTuples' :: String -> [Exp] -> Exp
 fieldsToTuples' name fs = fieldsToTuples'' (VarE $ mkName name) fs
+
+fieldsToTuples'' :: Exp -> [Exp] -> Exp
 fieldsToTuples'' expr fs = fieldsToTuples $ map (expr `AppE`) fs
+
 opToFunction op a b= UInfixE a (VarE $ mkName op) b
-identityBCR = BodyConsRules id fieldsToTuples (repeat AppE)
-applicativeBCR = BodyConsRules id fieldsToTuples (map opToFunction $ "<$>":repeat "<*>")
-extractBCR = BodyConsRules id (fieldsToTuples' "extract") (map opToFunction $ "<$>":repeat "<*>")
+
+-- | Generate convertor name from the types involved
+-- ex: (A) -> (B,C) -> (A,B,C) => iA'BCToABC
+defFunName  :: String -> [[String]] -> [String] -> String
+defFunName prefix sourcess targets = let
+  ss = map concat sourcess
+  t = concat targets
+  in uncapitalize $ prefix ++ (intercalate "'" ss) ++ "To" ++ t
+  
+identityBCR = BodyConsRules id fieldsToTuples (repeat AppE) (defFunName "i")
+applicativeBCR = BodyConsRules id fieldsToTuples (map opToFunction $ "<$>":repeat "<*>") (defFunName "a")
+extractBCR = BodyConsRules id (fieldsToTuples' "extract") (map opToFunction $ "<$>":repeat "<*>") (defFunName "e")
 monoidBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
                             (fieldsToTuples' f)
                             (map opToFunction $ repeat "<>")
+                            (defFunName "m")
 monoidPureBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
                             (fieldsToTuples'' (ParensE $ UInfixE (VarE $ mkName "pure")
                                                                  (VarE $ mkName ".")
@@ -142,6 +169,7 @@ monoidPureBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
                                               )
                             )
                             (map opToFunction $ repeat "<>")
+                            (defFunName "mp")
 
                 
 

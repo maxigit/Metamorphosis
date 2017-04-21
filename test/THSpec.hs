@@ -118,6 +118,15 @@ spec = do
            [p] = applyFieldMapping f [point]
        genConsClause identityBCR [[pPoint]] (p ^. tdCons) `shouldLookQ` "(Point x_0 y_1) = (P (GHC.Tuple.(,) x_0 y_1))"
 
+  describe "genConversion" $ do
+    it "generates simple convertor" $ do
+      genConversion identityBCR [[point]] [point'] `shouldLookQ`
+        "pointToPointI (Point x_0 y_1) = (Point (x_0) (y_1))"
+    it "used correct constructor for sum types" $ do
+      genConversion identityBCR [[a]] [a'] `shouldLookQ`
+        "aToA (A a1_0 a2_1) = (A (a1_0) (a2_1)) \
+        \aToA (Record style_0 price_1) = (Record (style_0) (price_1))"
+
        
 
 

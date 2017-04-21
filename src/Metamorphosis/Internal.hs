@@ -5,12 +5,14 @@ module Metamorphosis.Internal
 , applyFieldMapping
 , reverseTypeDescs
 , module Metamorphosis.Types
+, consCombinations
+, bestConstructorFor
 )
 where
 
 import Lens.Micro
 import Data.Function (on)
-import Data.List (sort, nub, nubBy, group, groupBy, intercalate)
+import Data.List (sort, nub, nubBy, group, groupBy, intercalate, minimum)
 import Metamorphosis.Types
 import qualified Data.Map as Map
 import Data.Map(Map)
@@ -113,3 +115,28 @@ filterByTypes typesToKeep types = filter (`elem` typesToKeep) types
 -- | Keeps types having one of the given constructors.
 filterByCons :: [ConsDesc] -> [TypeDesc] -> [TypeDesc]
 filterByCons consToKeep types = filter (\t -> any (`elem` consToKeep) (_tdCons t)) types
+
+-- * Hard bits
+-- | Generates all the constructor combinations corresponding to the given type.
+-- ex: for data AB = A a | B a ; data P = P x y ; data R = R 
+-- [[A,P], [R]]  -- (A,P) R
+-- [[B,P], [R]]   -- (B,P) R
+consCombinations :: [[TypeDesc]] -> [[[ConsDesc]]]
+consCombinations typesS = []
+
+
+-- For the given type, find the constructor which is best buildable
+-- from the given constructors (as function argument)
+-- example: Converting from data B = B b to AB = ABA a | ABB b
+-- the best suitable constructor given  (B b) would be ABB b
+bestConstructorFor :: [TypeDesc] -> [[ConsDesc]] -> [ConsDesc]
+bestConstructorFor typs sConss  = let
+  weighted = [ (weight sConss tCons, tCons)
+             | tConss <- consCombinations [typs]
+             , let [tCons] = tConss
+             ] 
+  weight _ _ = 0
+  in snd $ minimum weighted
+
+
+

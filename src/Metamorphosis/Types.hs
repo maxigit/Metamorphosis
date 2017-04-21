@@ -108,9 +108,10 @@ makeLenses ''TypeDesc
 makeLenses ''ConsDesc
 makeLenses ''FieldDescPlus
 -- | Defines how body constructor are generated.
-data BodyConsRules = BodyConsRules { bcrProcessCons :: Exp -> Exp
-                               , bcrProcessFields :: [Exp] -> Exp
-                               , bcrSeparator :: [Exp ->  Exp -> Exp]
+data BodyConsRules = BodyConsRules { _bcrProcessCons :: Exp -> Exp
+                               , _bcrProcessFields :: [Exp] -> Exp
+                               , _bcrSeparator :: [Exp ->  Exp -> Exp]
+                               , _bcrFunName :: [[String]] -> [String] -> String
                                }
 
 makeLenses '' BodyConsRules
