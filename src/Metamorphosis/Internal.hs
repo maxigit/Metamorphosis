@@ -7,6 +7,7 @@ module Metamorphosis.Internal
 , module Metamorphosis.Types
 , consCombinations
 , bestConstructorFor
+, typeSources
 )
 where
 
