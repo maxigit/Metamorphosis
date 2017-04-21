@@ -8,8 +8,11 @@ import Metamorphosis.Util
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Lens.Micro
-import Data.List(sort, intercalate)
+import Data.List(sort, intercalate, nub)
 import Control.Monad(zipWithM)
+import Data.Maybe(mapMaybe)
+import Data.Char(isLower)
+import Control.Monad (liftM2)
 
 
 -- | Retrieves the field descriptions of data type (from its Info)
@@ -61,6 +64,18 @@ typeToTypeNames (PromotedT t) = [nameBase t]
 typeToTypeNames (ListT) = ["[]"]
 typeToTypeNames info = error $ "typeToTypeNames not implemented for :" ++ show info
              
+
+-- | Converts a list of string (chain) to an AST type
+-- ex: ["Maybe", "Int"] -> Maybe Int
+typeNamesToType :: [String] -> Maybe Type
+typeNamesToType [] = Nothing
+typeNamesToType [t] | isVar t = Just $ VarT (mkName t)
+                | otherwise = Just $ ConT (mkName t)
+typeNamesToType (t:ts) =  liftM2 AppT (typeNamesToType [t]) (typeNamesToType ts)
+
+-- | Check if a variable name is a variable or a constructor (upper case)
+isVar [] = False
+isVar (c:cs) = isLower c
 
 -- * Generating Code
 -- | Generates a pattern from a constructor
@@ -172,4 +187,50 @@ monoidPureBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
                             (defFunName "mp")
 
                 
+
+
+-- * Generating Types
+-- | Generates a Type declaration from its Type Description
+generateType :: TypeDesc -> Dec
+generateType typ = let
+  cons =  typ ^. tdCons
+  fields = typ ^.. tdCons . each . cdFields  . each . fpField
+  varTypes = nub $ sort (concatMap _fdVarTypes fields)
+  in DataD [] (mkName $ typ ^. tdName) varTypes Nothing (map generateCons cons) []
+
+-- | Generates a Constructor declaration
+generateCons :: ConsDesc -> Con
+generateCons con = let
+  fields = sort $ con ^.. cdFields . each . fpField
+  cname = mkName (capitalize $ con ^. cdName)
+  in case traverse _fdToVarBangType fields of
+     Nothing -> NormalC cname (mapMaybe _fdBangType fields)
+     Just [] -> NormalC cname []
+     Just varbangs -> RecC cname varbangs
+
+-- | Convert a {FieldDesc}  to a TH {BangType} : a field without name  in a constructor declaration
+-- ex : !Int in data A =  A !Int 
+_fdBangType :: FieldDesc -> Maybe BangType
+_fdBangType field = fmap (\t -> (_fdBang field, t)) (_fdTyp field)
+
+-- | Convert a {FieldDesc}  to a TH {VarBangType} : a field a name  in a record declaration
+-- ex : x :: Int in data R =  R { x :: Int }
+_fdToVarBangType :: FieldDesc -> Maybe VarBangType
+_fdToVarBangType field = case _fdFieldName field of
+  Nothing -> Nothing
+  Just name -> fmap (\t -> (mkName name, _fdBang field, t)) (_fdTyp field)
+  
+-- | Get the Type of a FieldDesc
+_fdTyp :: FieldDesc -> Maybe Type
+_fdTyp field = typeNamesToType (_fdTypes field)
+
+ 
+-- | Extract parametric variables from a field
+-- example "f Int" -> ["f"]
+_fdVarTypes :: FieldDesc -> [TyVarBndr]
+_fdVarTypes field = let
+  vars = filter (isVar) (_fdTypes field)
+  in map (PlainTV . mkName) vars
+
+
 
