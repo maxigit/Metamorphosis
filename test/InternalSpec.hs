@@ -43,14 +43,14 @@ abT = TypeDesc "AB"
               ]            
 xyT = TypeDesc "XY"
               Nothing
-              [ let xyxC = ConsDesc "XYX" xyT [ FieldDescPlus b1 xyxC []
-                                              , FieldDescPlus b2 xyxC []
+              [ let xy1C = ConsDesc "XY1" xyT [ FieldDescPlus b1 xy1C []
+                                              , FieldDescPlus b2 xy1C []
                                               ]
-                in xyxC
-              , let xyyC = ConsDesc "XYX" xyT [ FieldDescPlus b1 xyyC []
-                                              , FieldDescPlus b2 xyyC []
+                in xy1C
+              , let xy2C = ConsDesc "XY2" xyT [ FieldDescPlus b1 xy2C []
+                                              , FieldDescPlus b2 xy2C []
                                               ]
-                in xyyC
+                in xy2C
               ]            
 
 tdField cons field = tdCons . ix cons . cdFields . ix field
@@ -95,21 +95,28 @@ spec = do
   describe "consCombinations" $ do
     it "combines like tuples" $ do
       (_cdName <$$$> consCombinations [[aT, xyT]])
-        `shouldBe` [ [["A", "XYX"]]
-                   , [["B", "XYY"]]
+        `shouldBe` [ [["A", "XY1"]]
+                   , [["A", "XY2"]]
                    ]
     it "combines like argument" $ do
       (_cdName <$$$> consCombinations [[aT], [xyT]])
-        `shouldBe` [ [["A"], ["XYX"]]
-                   , [["B"], ["XYY"]]
+        `shouldBe` [ [["A"], ["XY1"]]
+                   , [["A"], ["XY2"]]
                    ]
-  it "combines everything" $ do
-      (_cdName <$$$> consCombinations [[xyT], [abT, bT]])
-        `shouldBe` [ [["XYX"] , ["ABA", "B"]]
-                   , [["XYY"] , ["ABA", "B"]]
-                   , [["XYX"] , ["ABB", "B"]]
-                   , [["XYY"] , ["ABB", "B"]]
-                   ]
+    it "combines everything" $ do
+        (_cdName <$$$> consCombinations [[xyT], [abT, bT]])
+          `shouldBe` [ [["XY1"] , ["ABA", "B"]]
+                    , [["XY1"] , ["ABB", "B"]]
+                    , [["XY2"] , ["ABA", "B"]]
+                    , [["XY2"] , ["ABB", "B"]]
+                    ]
+    it "combines everything II" $ do
+        (_cdName <$$$> consCombinations [[xyT, abT], [bT]])
+          `shouldBe` [ [["XY1", "ABA"], ["B"]]
+                    , [["XY1", "ABB"], ["B"]]
+                    , [["XY2", "ABA"], ["B"]]
+                    , [["XY2", "ABB"], ["B"]]
+                    ]
 
   
 

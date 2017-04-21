@@ -122,7 +122,14 @@ filterByCons consToKeep types = filter (\t -> any (`elem` consToKeep) (_tdCons t
 -- [[A,P], [R]]  -- (A,P) R
 -- [[B,P], [R]]   -- (B,P) R
 consCombinations :: [[TypeDesc]] -> [[[ConsDesc]]]
-consCombinations typesS = []
+consCombinations typs = go [] typs
+  where go cs [] = [[reverse cs]]
+        go cs ([]:[]) =  go cs []
+        go cs ([]:typs) =  map (reverse cs:) (go [] typs)
+        go cs ((typ:typs):typs') = [  comb
+                           | con <- _tdCons typ
+                           , comb <- go (con:cs) (typs:typs')
+                           ]
 
 
 -- For the given type, find the constructor which is best buildable
