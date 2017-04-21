@@ -191,12 +191,12 @@ monoidPureBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
 
 -- * Generating Types
 -- | Generates a Type declaration from its Type Description
-generateType :: TypeDesc -> Dec
-generateType typ = let
+generateType :: [Name] -> TypeDesc -> Dec
+generateType derivs typ = let
   cons =  typ ^. tdCons
   fields = typ ^.. tdCons . each . cdFields  . each . fpField
   varTypes = nub $ sort (concatMap _fdVarTypes fields)
-  in DataD [] (mkName $ typ ^. tdName) varTypes Nothing (map generateCons cons) []
+  in DataD [] (mkName $ typ ^. tdName) varTypes Nothing (map generateCons cons) (map VarT derivs)
 
 -- | Generates a Constructor declaration
 generateCons :: ConsDesc -> Con

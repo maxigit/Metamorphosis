@@ -120,7 +120,7 @@ spec = do
 
   describe "genConversion" $ do
 
-    it "generates simple convertor" $ do
+    it "generates simple converter" $ do
       genConversion identityBCR [[point]] [point'] `shouldLookQ`
         "iPointToPoint (Point x_0 y_1) = (Point (x_0) (y_1))"
 
@@ -128,6 +128,14 @@ spec = do
       genConversion identityBCR [[a]] [a'] `shouldLookQ`
         "iAToA (A a1_0 a2_1) = (A (a1_0) (a2_1)) \
         \iAToA (Record style_2 price_3) = (Record (style_2) (price_3))"
+
+  describe "generateType" $ do
+    it "generates complex type" $ do
+      generateType [''Show] a `shouldLook`
+        "data A = A Int String | Record {style :: String, price :: Double} deriving GHC.Show.Show"
+    it "generates parametric type" $ do
+      generateType [] point `shouldLook`
+        "data Point a = Point {x :: a, y :: a}" 
 
        
 
