@@ -16,6 +16,8 @@ import Data.List (sort, nub, nubBy, group, groupBy, intercalate, minimum)
 import Metamorphosis.Types
 import qualified Data.Map as Map
 import Data.Map(Map)
+import Data.Set(Set)
+import qualified Data.Set as Set
 
 -- | Structure Field Descriptions to types
 fieldsToTypes :: [FieldDesc] -> [TypeDesc]
@@ -138,12 +140,20 @@ consCombinations typs = go [] typs
 -- the best suitable constructor given  (B b) would be ABB b
 bestConstructorFor :: [TypeDesc] -> [[ConsDesc]] -> [ConsDesc]
 bestConstructorFor typs sConss  = let
-  weighted = [ (weight sConss tCons, tCons)
+  sourceFields :: Set FieldDescPlus
+  sourceFields = Set.fromList (sConss ^.. each . each . cdFields . each)
+  weighted = [ (sum (map weight tCons), tCons)
              | tConss <- consCombinations [typs]
-             , let [tCons] = tConss
+             , tCons <- tConss
              ] 
-  weight _ _ = 0
-  in snd $ minimum weighted
+  -- weight = source variable not found (that will be converted to ())
+  weight :: ConsDesc -> Int
+  weight tCons = let
+    used = [Set.member  fp sourceFields | fp <- tCons ^.. cdFields . each . fpSources . each ]
+    in  length (filter (==False) used)
+
+    
+  in  snd $ minimum weighted
 
 
 
