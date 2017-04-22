@@ -69,17 +69,17 @@ spec = do
                                           ]
   describe "reverseTypeDescs" $ do
     context "one to one" $ do
+      let   resetSourceSources = each . tdCons . each . cdFields . each . fpSources . each . fpSources .~ []
       it "set sources properly" $ do
         let f = return . (fdTConsName .~ "B") . (fdTypes %~ ("Maybe":))
             [bT'] = applyFieldMapping f [aT]
-        reverseTypeDescs [bT']  `shouldBe` [ aT & tdField 0 0 . fpSources .~  bT' ^.. tdField 0 0
+        reverseTypeDescs [bT']  `shouldBe` resetSourceSources [ aT & tdField 0 0 . fpSources .~  bT' ^.. tdField 0 0
                                                 & tdField 0 1 . fpSources .~  bT' ^.. tdField 0 1
                                           ]
       it "is idempotent" $ do
         let f = return . (fdTConsName .~ "B") . (fdTypes %~ ("Maybe":))
             [bT'] = applyFieldMapping f [aT]
             -- We just set the sources sources to [] to make the comparison easier
-            resetSourceSources = each . tdCons . each . cdFields . each . fpSources . each . fpSources .~ []
         resetSourceSources ( reverseTypeDescs (reverseTypeDescs [bT']))  `shouldBe` [bT'] 
   context "many to one " $ do
     let f = return . (fdTConsName .~ "C")

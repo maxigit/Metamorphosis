@@ -8,6 +8,7 @@ module Metamorphosis.Internal
 , consCombinations
 , bestConstructorFor
 , typeSources
+, converterBaseName
 )
 where
 
@@ -19,6 +20,7 @@ import qualified Data.Map as Map
 import Data.Map(Map)
 import Data.Set(Set)
 import qualified Data.Set as Set
+import Metamorphosis.Util
 
 -- | Structure Field Descriptions to types
 fieldsToTypes :: [FieldDesc] -> [TypeDesc]
@@ -72,24 +74,24 @@ applyFieldMapping fieldMapping typDs = let
 -- | Extract the sources and recompute the source
 -- so they point to the original target.
 -- It should be equivalent to applying the inverse of a fieldMapping to types
--- (which where target when calling applyingFieldMapping)
+-- (which where targets when calling applyingFieldMapping)
 -- prop  rev.rev = id
 reverseTypeDescs :: [TypeDesc] -> [TypeDesc]
 reverseTypeDescs typDs = let
-  originalTargets = typDs ^. each.tdCons.each.cdFields
+  sources = typeSources typDs
+  targetFields = typDs ^. each.tdCons.each.cdFields
 
   sources'target = [(_fpKey source, (source, [originalTarget]))
-                   | originalTarget <- originalTargets
+                   | originalTarget <- targetFields
                    , source <- _fpSources originalTarget
                    ]
 
   sourcesMap = Map.fromListWith (\(n, ss) (_,ss') -> (n, ss++ss')) sources'target
   setSources fp = fp { _fpSources = maybe []
-                                          snd
+                                          ((mapped . fpSources .~ []) . snd)
                                           (Map.lookup (fp ^. to _fpKey) sourcesMap)
                      }
-  newTypes0 = fieldsToTypes (map (_fpField.fst) (Map.elems sourcesMap))
-  in newTypes0 & mapped.tdCons.mapped.cdFields.mapped %~ setSources
+  in sources & mapped.tdCons.mapped.cdFields.mapped %~ setSources
 
   
 
@@ -135,7 +137,7 @@ consCombinations typs = go [] typs
                            ]
 
 
--- For the given type, find the constructor which is best buildable
+-- | For the given type, find the constructor which is best buildable
 -- from the given constructors (as function argument)
 -- example: Converting from data B = B b to AB = ABA a | ABB b
 -- the best suitable constructor given  (B b) would be ABB b
@@ -155,6 +157,17 @@ bestConstructorFor typs sConss  = let
 
     
   in  snd $ minimum weighted
+
+
+-- | Computes a converter name.
+-- This is the base name to be used to filter converter to generates.
+-- It is not a valid name and needs to be prefixed by something starting with lower case.
+-- ex: (A) -> (B,C) -> (A,B,C) => AB'CToABC
+converterBaseName  :: [[String]] -> [String] -> String
+converterBaseName sourcess targets = let
+  ss = map (intercalate "''") sourcess
+  t = concat targets
+  in (concat ss) ++ "To" ++ t
 
 
 

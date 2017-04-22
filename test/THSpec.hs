@@ -121,11 +121,11 @@ spec = do
   describe "genConversion" $ do
 
     it "generates simple converter" $ do
-      genConversion identityBCR [[point]] [point'] `shouldLookQ`
+      genConversion "PointToPoint" identityBCR [[point]] [point'] `shouldLookQ`
         "iPointToPoint (Point x_0 y_1) = (Point (x_0) (y_1))"
 
     it "uses correct constructor for sum types" $ do
-      genConversion identityBCR [[a]] [a'] `shouldLookQ`
+      genConversion "AToA" identityBCR [[a]] [a'] `shouldLookQ`
         "iAToA (A a1_0 a2_1) = (A (a1_0) (a2_1)) \
         \iAToA (Record style_2 price_3) = (Record (style_2) (price_3))"
 

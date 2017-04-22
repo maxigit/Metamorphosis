@@ -111,7 +111,7 @@ makeLenses ''FieldDescPlus
 data BodyConsRules = BodyConsRules { _bcrProcessCons :: Exp -> Exp
                                , _bcrProcessFields :: [Exp] -> Exp
                                , _bcrSeparator :: [Exp ->  Exp -> Exp]
-                               , _bcrFunName :: [[String]] -> [String] -> String
+                               , _bcrFunName :: String -> String
                                }
 
 makeLenses '' BodyConsRules

@@ -137,13 +137,12 @@ genConsBodyE (BodyConsRules consF fieldsF opFs _) fieldToName consDesc = let
 
 
 -- | Generates a conversion between a set of tuples types to a set of types
-genConversion :: BodyConsRules -> [[TypeDesc]] -> [TypeDesc] -> Q Dec
-genConversion rules sourcess targets = do
-  let fname = _bcrFunName rules (map (map _tdName) sourcess) (map _tdName targets)
-      consSources = consCombinations sourcess
+genConversion :: String -> BodyConsRules -> [[TypeDesc]] -> [TypeDesc] -> Q Dec
+genConversion baseName rules sourcess targets = do
+  let consSources = consCombinations sourcess
       bestTargetsCons = map (bestConstructorFor targets) consSources
   clauses  <- zipWithM (genConsClause rules) consSources bestTargetsCons
-  return $ FunD (mkName fname) clauses
+  return $ FunD (mkName $ _bcrFunName rules baseName) clauses
 
 
 
@@ -162,21 +161,14 @@ fieldsToTuples'' expr fs = fieldsToTuples $ map (expr `AppE`) fs
 
 opToFunction op a b= UInfixE a (VarE $ mkName op) b
 
--- | Generate convertor name from the types involved
--- ex: (A) -> (B,C) -> (A,B,C) => iA'BCToABC
-defFunName  :: String -> [[String]] -> [String] -> String
-defFunName prefix sourcess targets = let
-  ss = map concat sourcess
-  t = concat targets
-  in uncapitalize $ prefix ++ (intercalate "'" ss) ++ "To" ++ t
   
-identityBCR = BodyConsRules id fieldsToTuples (repeat AppE) (defFunName "i")
-applicativeBCR = BodyConsRules id fieldsToTuples (map opToFunction $ "<$>":repeat "<*>") (defFunName "a")
-extractBCR = BodyConsRules id (fieldsToTuples' "extract") (map opToFunction $ "<$>":repeat "<*>") (defFunName "e")
+identityBCR = BodyConsRules id fieldsToTuples (repeat AppE) ('i':)
+applicativeBCR = BodyConsRules id fieldsToTuples (map opToFunction $ "<$>":repeat "<*>") ('a':)
+extractBCR = BodyConsRules id (fieldsToTuples' "extract") (map opToFunction $ "<$>":repeat "<*>")  ('e':)
 monoidBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
                             (fieldsToTuples' f)
                             (map opToFunction $ repeat "<>")
-                            (defFunName "m")
+                            ('m':)
 monoidPureBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
                             (fieldsToTuples'' (ParensE $ UInfixE (VarE $ mkName "pure")
                                                                  (VarE $ mkName ".")
@@ -184,7 +176,7 @@ monoidPureBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
                                               )
                             )
                             (map opToFunction $ repeat "<>")
-                            (defFunName "mp")
+                            ("mp"++)
 
                 
 
