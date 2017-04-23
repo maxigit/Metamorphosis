@@ -9,6 +9,7 @@ import Metamorphosis
 import Control.Monad
 import Metamorphosis.Applicative
 import Data.Functor.Identity
+import Control.Applicative
 
 data Product = Product { style :: String
                        , variation :: String
@@ -46,7 +47,7 @@ styleSpecs =
 data Record = Record { code :: String, price :: Double} deriving (Read, Show, Eq, Ord)
 -- | Generates parametric version of Record
 -- Unfortunately we can't derives Eq and Show in the general case, so we'll have to
--- do it manually.
+-- do it mahttps://lukepalmer.wordpress.com/2010/01/24/haskell-antipattern-existential-typeclass/nually.
 -- data RecordF f = RecordF f { code :: f String, price :: f Double}
 $(metamorphosis
    ( return
@@ -65,7 +66,7 @@ deriving instance Show (RecordF [])
 deriving instance Eq (RecordF [])
 
 recordFSpec =
-  describe "Parametric record" $ do
+  describe "Parametric records" $ do
     it "builds an applicative version " $ do
       eRecordToRecordF (Record "T-Shirt" 7) `shouldBe` Identity (RecordF (Just "T-Shirt") (Just 7))
     it "traverses when all values are present" $ do
@@ -74,7 +75,9 @@ recordFSpec =
       eRecordFToRecord (RecordF (Just "T-Shirt") Nothing) `shouldBe` Nothing
     it "generates copy" $ do
       eRecordFToRecordF (RecordF (Just "T-Shirt") (Just 7))  `shouldBe` Identity (RecordF ["T-Shirt"] [7])
-      
+    it "traverse ZipList" $ do
+      eRecordFToRecord (RecordF ["T-Shirt", "Cap"] [7, 2.5])  `shouldBe`
+        ZipList [(Record ("T-Shirt") 7), (Record ("Cap") 2.5 )]
 
   
 spec = do

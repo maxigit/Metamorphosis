@@ -25,6 +25,9 @@ instance Extract (Maybe a) Identity [a] where
   extract Nothing = Identity []
   extract (Just x) = Identity [x]
 
+instance Extract ([a]) ZipList a where
+  extract = ZipList
+
 instance (Applicative f, Extract a f a', Extract b f b') => Extract (a, b) f (a',b') where
   extract (a,b) = (,) <$> extract a <*> extract b
 instance (Applicative f, Extract a f a', Extract b f b', Extract c f c') => Extract (a, b, c) f (a',b', c') where
