@@ -21,6 +21,9 @@ instance Extract () Maybe a where
   extract () = Nothing
 instance Monoid a => Extract () Identity a where
   extract () = Identity mempty
+instance Extract (Maybe a) Identity [a] where
+  extract Nothing = Identity []
+  extract (Just x) = Identity [x]
 
 instance (Applicative f, Extract a f a', Extract b f b') => Extract (a, b) f (a',b') where
   extract (a,b) = (,) <$> extract a <*> extract b

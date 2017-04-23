@@ -5,6 +5,8 @@
 module Metamorphosis
 ( metamorphosis
 , identityBCR
+, applicativeBCR
+, extractBCR
 , module Metamorphosis.Types
 ) where
 
@@ -32,8 +34,10 @@ metamorphosis f sources rulesF deriv = do
 
   converters <- genConverters rulesF targetTypes
   converters' <- genConverters rulesF sourceTypes'
+  copiers <- genCopiers rulesF targetTypes
+  copiers' <- genCopiers rulesF sourceTypes'
 
-  return $ typeDecls ++ converters ++ converters'
+  return $ typeDecls ++ converters ++ converters' ++ copiers ++ copiers'
 
 
 -- | Generates all possible converter between different classes
@@ -61,3 +65,10 @@ genConverters rulesF targets' = do
         , rules <- maybeToList $ rulesF name
         ]
   mapM (\(rules, name, srcs, tgts) -> genConversion name rules (unnest srcs) tgts) combinations
+
+-- | Generates converter to itself
+-- Useful for parametric types, to convert between same type
+-- but changing the type parameter
+
+genCopiers rulesF targets' =  genConverters rulesF targets where
+  targets = targets' & mapped . tdCons. mapped. cdFields . mapped . fpSources .~ []
