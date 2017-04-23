@@ -102,16 +102,13 @@ spec = do
       genCopy [[aRecord]] [pPoint] `shouldLookQ` "(Record _ _) = (Point () ())"
 
     it "generates applicatives" $ do
-      genConsClause applicativeBCR [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (A <$> (a1_0) <*> (a2_1))"
+      genConsClause applicativeBCR [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (A <$> (convertA a1_0) <*> (convertA a2_1))"
 
     it "generates to monoid" $ do
       genConsClause (monoidBCR "return") [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (mempty <> (return a1_0) <> (return a2_1))"
 
     it "generates to monoid with Pure" $ do
       genConsClause (monoidPureBCR "show") [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (mempty <> ((pure . show) a1_0) <> ((pure . show) a2_1))"
-
-    it "generates extractor" $ do
-      genConsClause extractBCR [[aA]] [aA'] `shouldLookQ` "(A a1_0 a2_1) = (A <$> (extract a1_0) <*> (extract a2_1))"
 
     it "use multiple constructors (tuples)" $ do
        let f = ( return . (fdFieldName .~ (Just "P")) . (fdTConsName .~ "P"))

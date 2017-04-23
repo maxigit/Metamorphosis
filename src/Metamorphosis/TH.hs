@@ -163,8 +163,7 @@ opToFunction op a b= UInfixE a (VarE $ mkName op) b
 
   
 identityBCR = BodyConsRules id fieldsToTuples (repeat AppE) ('i':)
-applicativeBCR = BodyConsRules id fieldsToTuples (map opToFunction $ "<$>":repeat "<*>") ('a':)
-extractBCR = BodyConsRules id (fieldsToTuples' "extract") (map opToFunction $ "<$>":repeat "<*>")  ('e':)
+applicativeBCR = BodyConsRules id (fieldsToTuples' "convertA") (map opToFunction $ "<$>":repeat "<*>")  ('a':)
 monoidBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
                             (fieldsToTuples' f)
                             (map opToFunction $ repeat "<>")

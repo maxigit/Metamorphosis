@@ -6,7 +6,6 @@ module Metamorphosis
 ( metamorphosis
 , identityBCR
 , applicativeBCR
-, extractBCR
 , module Metamorphosis.Types
 ) where
 

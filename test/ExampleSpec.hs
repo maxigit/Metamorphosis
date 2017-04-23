@@ -55,8 +55,7 @@ $(metamorphosis
    . (fdTypes %~ ("f":))
    )
    [''Record]
-   -- (const (Just extractBCR))
-   (const (Just extractBCR))
+   (const (Just applicativeBCR))
    (const [])
  )
 
@@ -68,15 +67,15 @@ deriving instance Eq (RecordF [])
 recordFSpec =
   describe "Parametric records" $ do
     it "builds an applicative version " $ do
-      eRecordToRecordF (Record "T-Shirt" 7) `shouldBe` Identity (RecordF (Just "T-Shirt") (Just 7))
+      aRecordToRecordF (Record "T-Shirt" 7) `shouldBe` Identity (RecordF (Just "T-Shirt") (Just 7))
     it "traverses when all values are present" $ do
-      eRecordFToRecord (RecordF (Just "T-Shirt") (Just 7)) `shouldBe` Just (Record "T-Shirt" 7) 
+      aRecordFToRecord (RecordF (Just "T-Shirt") (Just 7)) `shouldBe` Just (Record "T-Shirt" 7) 
     it "doesn't traverse when on value is missing" $ do
-      eRecordFToRecord (RecordF (Just "T-Shirt") Nothing) `shouldBe` Nothing
+      aRecordFToRecord (RecordF (Just "T-Shirt") Nothing) `shouldBe` Nothing
     it "generates copy" $ do
-      eRecordFToRecordF (RecordF (Just "T-Shirt") (Just 7))  `shouldBe` Identity (RecordF ["T-Shirt"] [7])
+      aRecordFToRecordF (RecordF (Just "T-Shirt") (Just 7))  `shouldBe` Identity (RecordF ["T-Shirt"] [7])
     it "traverse ZipList" $ do
-      eRecordFToRecord (RecordF ["T-Shirt", "Cap"] [7, 2.5])  `shouldBe`
+      aRecordFToRecord (RecordF ["T-Shirt", "Cap"] [7, 2.5])  `shouldBe`
         ZipList [(Record ("T-Shirt") 7), (Record ("Cap") 2.5 )]
 
   
