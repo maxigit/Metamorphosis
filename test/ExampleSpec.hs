@@ -15,7 +15,7 @@ import Data.Maybe
 import Data.Monoid (mempty, (<>))
 
 -- * Subrecord
--- In this example, we want to extract some fields
+-- | In this example, we want to extract some fields
 -- from a record to create a new record.
 -- Given Product :
 data Product = Product { style :: String
@@ -75,11 +75,21 @@ styleSpecs = describe "Sub record" $ do
    
 
 -- * Record parametrized by a functor.
+-- | In this example we want to parametrize all the field of a record
+-- by the same functor.
 data Record = Record { code :: String, price :: Double} deriving (Read, Show, Eq, Ord)
+-- to
+-- data RecordF f = RecordF f { code :: f String, price :: f Double}
+-- The idea behind is to be able to "traverse" it and get a `f Record` from a `RecordF f`.
+-- For example go from `RecordF (Just "T-Shirt") (Just 4)` to `Just (Record "T-Shirt" 4)`.
+-- This is really handy when doing record validation.
+-- In this case, the converters are not one to one, but needs to be run within an applicative
+-- functor. We use the `applicativeBCR` rules instead of `identityBCR`.
+-- Note, that all of our converters start with an a.
+
 -- | Generates parametric version of Record
 -- Unfortunately we can't derives Eq and Show in the general case, so we'll have to
 -- do it manually.
--- data RecordF f = RecordF f { code :: f String, price :: f Double}
 $(metamorphosis
    ( return
    . (fdTConsName .~ "RecordF")
@@ -99,10 +109,13 @@ recordFSpec =
   describe "Parametric records" $ do
     it "builds an applicative version " $ do
       aRecordToRecordF (Record "T-Shirt" 7) `shouldBe` Identity (RecordF (Just "T-Shirt") (Just 7))
+
     it "traverses when all values are present" $ do
       aRecordFToRecord (RecordF (Just "T-Shirt") (Just 7)) `shouldBe` Just (Record "T-Shirt" 7) 
+
     it "doesn't traverse when on value is missing" $ do
       aRecordFToRecord (RecordF (Just "T-Shirt") Nothing) `shouldBe` Nothing
+
     it "generates copy" $ do
       aRecordFToRecordF (RecordF (Just "T-Shirt") (Just 7))  `shouldBe` Identity (RecordF ["T-Shirt"] [7])
     it "traverse ZipList" $ do
@@ -110,6 +123,18 @@ recordFSpec =
         ZipList [(Record ("T-Shirt") 7), (Record ("Cap") 2.5 )]
 
 -- * Many to Many
+-- | This example demonstrates the one-to-many and many-to-one capability at the same time.
+-- One-to-many would be split one type into many smaller one and the many-to-one
+-- would merge two smaller types into a big one. In here, we reshape 2 types, AB and C
+-- to two other one A and BC.
+-- Metamorphosis generates all the possible converters, including
+-- aAB'CToA'BC :: AB -> C -> (f A, f BC)
+-- but also getters and settes
+-- aBCToC :: BC ->  A
+-- aBC'CToBC :: BC -> C -> f BC 
+-- Note that we use the applicativeBCR instead of identityBCR.
+-- It is only so that we create a BC From a C by converting a () to Maybe Int.
+-- In theory, it shouldn't be needed.
 data AB = AB { a :: Int, b :: Maybe Int} deriving (Eq, Show)
 data C = C { c :: Int } deriving (Eq, Show)
 -- Transforms AB,C to A,BC
@@ -139,10 +164,18 @@ manyToManySpec = describe "Many to Many" $ do
     aBCToC (BC Nothing 7) `shouldBe` Identity (C 7)
 
 -- * Types to Sum
+-- | Now, we want to merge a few type to one sum type with one contructor per initial type.
 data CInt = CInt Int deriving (Show, Eq)
 data CString = CString String deriving (Show, Eq)
 data CDouble = CDouble Double deriving (Show, Eq)
+-- | Will give
 --  data SumC = SInt Int | SString String | SDouble Double
+-- At the moment the new type copy the definition of each initial types instead
+-- of something like data SumC = SInt CInt | SDouble CDouble ...
+-- It it possible to generate such a class at the moment. But the converters
+-- will have to be generated manually (for the moment), which defeat the object
+-- of Metamorphosis.
+
 $(metamorphosis
  ( (:[])
    . (fdTypeName .~ "SumC")
@@ -156,13 +189,18 @@ toSumSpecs = describe "To sum" $ do
   context "use the correct constructor" $ do
     it "SInt" $ do
       aCIntToSumC (CInt 3) `shouldBe` Identity (SInt 3)
+
     it "SDouble" $ do
       aCDoubleToSumC (CDouble 4.5) `shouldBe` Identity (SDouble 4.5)
+
     it "SDouble" $ do
       aCStringToSumC (CString "foo") `shouldBe` Identity (SString "foo")
+
+
   context "extract an CInt" $ do
     it "if possible" $ do 
       aSumCToCInt (SInt 5) `shouldBe` (Just (CInt 5))
+
     it "if not possible" $ do 
       aSumCToCInt (SDouble 4.5) `shouldBe` Nothing
 
@@ -172,7 +210,11 @@ toSumSpecs = describe "To sum" $ do
   it "extract all at the same time" $ do
     aSumCToCDouble'CInt'CString (SInt 7) `shouldBe` (Nothing, Just (CInt 7), Nothing)
 
+  
 -- * Types to Enum
+-- Generates a Enum corresponding to the given class. It could be used in conjunction with
+-- the previous sum types SumC to identify the "flavour" of a given data.
+-- At the moment, the generation of automatic converters doesn't work.
 --  data EnumC = EInt | EString | EDouble 
 $(metamorphosis
  ( (:[])
