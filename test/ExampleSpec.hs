@@ -11,6 +11,7 @@ import Metamorphosis.Applicative
 import Data.Functor.Identity
 import Control.Applicative
 import Data.Maybe
+import Data.Monoid (mempty, (<>))
 
 -- * Simple record
 data Product = Product { style :: String
@@ -163,6 +164,24 @@ toEnumSpecs = describe "To enum" $ do
   -- CIntTo
      
 
+-- * Mapping over fields
+-- This is only a hack to see how to map over all the fields.
+-- The main API needs to be changed
+$(metamorphosis
+ ( (:[])
+   . (fdTConsName .~ "ShowProduct")
+ )
+ [''Product]
+ (\n -> if n == "ProductToShowProduct" then (Just (monoidPureBCR "show")) else Nothing)
+ (const [])
+ )
+monoidSpecs = describe "To Monoid" $ do
+  it "shows" $ do
+    mpProductToShowProduct (Product "style" "var" 4.5 17) `shouldBe` ["\"style\"", "\"var\"", "4.5", "17"]
+  it "" (pendingWith ("rewrite API"))
+
+
+
     
   
 spec = do
@@ -171,6 +190,7 @@ spec = do
   manyToManySpec
   toSumSpecs
   toEnumSpecs
+  monoidSpecs
 
 
  

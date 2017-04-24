@@ -6,6 +6,8 @@ module Metamorphosis
 ( metamorphosis
 , identityBCR
 , applicativeBCR
+, monoidBCR
+, monoidPureBCR
 , module Metamorphosis.Types
 ) where
 
