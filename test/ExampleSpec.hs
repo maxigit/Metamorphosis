@@ -10,6 +10,7 @@ import Control.Monad
 import Metamorphosis.Applicative
 import Data.Functor.Identity
 import Control.Applicative
+import Data.Maybe
 
 -- * Simple record
 data Product = Product { style :: String
@@ -107,11 +108,69 @@ manyToManySpec = describe "Many to Many" $ do
   it "extracts C from a BC" $ do
     aBCToC (BC Nothing 7) `shouldBe` Identity (C 7)
 
+-- * Types to Sum
+data CInt = CInt Int deriving (Show, Eq)
+data CString = CString String deriving (Show, Eq)
+data CDouble = CDouble Double deriving (Show, Eq)
+--  data SumC = SInt Int | SString String | SDouble Double
+$(metamorphosis
+ ( (:[])
+   . (fdTypeName .~ "SumC")
+   . (fdConsName %~ (("S" ++) . tail))
+ )
+ [''CInt, ''CString, ''CDouble]
+ (const (Just applicativeBCR))
+ (const [''Show, ''Eq]) 
+ )
+toSumSpecs = describe "To sum" $ do
+  context "use the correct constructor" $ do
+    it "SInt" $ do
+      aCIntToSumC (CInt 3) `shouldBe` Identity (SInt 3)
+    it "SDouble" $ do
+      aCDoubleToSumC (CDouble 4.5) `shouldBe` Identity (SDouble 4.5)
+    it "SDouble" $ do
+      aCStringToSumC (CString "foo") `shouldBe` Identity (SString "foo")
+  context "extract an CInt" $ do
+    it "if possible" $ do 
+      aSumCToCInt (SInt 5) `shouldBe` (Just (CInt 5))
+    it "if not possible" $ do 
+      aSumCToCInt (SDouble 4.5) `shouldBe` Nothing
+
+  it "extract twos at the same time" $ do
+    aSumCToCDouble'CInt (SDouble 4.5) `shouldBe` (Just (CDouble 4.5), Nothing)
+
+  it "extract all at the same time" $ do
+    aSumCToCDouble'CInt'CString (SInt 7) `shouldBe` (Nothing, Just (CInt 7), Nothing)
+
+-- * Types to Enum
+--  data EnumC = EInt | EString | EDouble 
+$(metamorphosis
+ ( (:[])
+   . (fdTypeName .~ "EnumC")
+   . (fdConsName %~ (("E" ++) . tail))
+   . (fdFieldName .~ Nothing)
+   . (fdTypes .~ [])
+ )
+ [''CInt, ''CString, ''CDouble]
+ (const Nothing)
+ (const [''Show, ''Eq, ''Enum, ''Bounded])
+ )
+toEnumSpecs = describe "To enum" $ do
+  it "defines all contructors" $ do
+    -- @TODO should be Eint, EString, EDouble
+    [minBound..maxBound] `shouldBe` [EDouble, EInt, EString]
+  it "convert to the correct constructor" (pendingWith "TODO")
+  -- CIntTo
+     
+
+    
   
 spec = do
   styleSpecs
   recordFSpec
   manyToManySpec
+  toSumSpecs
+  toEnumSpecs
 
 
  
