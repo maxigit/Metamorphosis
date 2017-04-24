@@ -1,6 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE StandaloneDeriving, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 module ExampleSpec where
 
 import Test.Hspec
@@ -13,17 +14,30 @@ import Control.Applicative
 import Data.Maybe
 import Data.Monoid (mempty, (<>))
 
--- * Simple record
+-- * Subrecord
+-- In this example, we want to extract some fields
+-- from a record to create a new record.
+-- Given Product :
 data Product = Product { style :: String
                        , variation :: String
                        , price :: Double
                        , quantity :: Int
                        } deriving (Show, Eq)
-
--- | Generates Style type
+-- We want to generate :
 -- data Style = Style { style :: String
 --                    , price :: Double
 --                    } deriving (Show, Eq)
+-- We also want to be able to convert from one to another.
+-- The field mapping function should keep style and price but drop the other.
+-- This is done, by return [] For the other fields.
+-- To convert a Product to a Style we need ProductToStyle
+-- For the other way, we need some default values, the easiest
+-- is to actually use a "setting" function Product'StyleToProduct.
+-- You can easily create your own StyleToProduct function by setting
+-- default product : iStyleToProduct = iProduct'StyleToProduct myDefaultProduct
+-- Note the i prefix. it means identity. As are our converters are straightforward
+-- (They can't fail neither return more than one value).
+
 $(metamorphosis
    ( (\fd -> if fd ^. fdFieldName `elem` map Just ["variation", "quantity"]
              then []
@@ -37,13 +51,28 @@ $(metamorphosis
    )
    (const [''Show, ''Eq])
  )
+-- This will generate
+-- data Style = Style { style :: String
+--                    , price :: Double
+--                    } deriving (Show, Eq)
+-- iProductToStyle :: Product -> Style
+-- iProduct'StyleToProduct :: Product -> Style -> Product
+-- Note that you can create a style lens using :`style = lens iProductToStyle iProduct'StyleToProduct`
 
-styleSpecs = 
-  describe "Style" $ do
+styleSpecs = describe "Sub record" $ do
+  context "converters" $ do
     it "gets a Style from a Product" $ do
       iProductToStyle (Product "style" "var" 15.5 2 ) `shouldBe` (Style "style" 15.50) 
     it "sets a Style inside a Product" $ do
       iProduct'StyleToProduct (Product "style" "var" 15.0 2) (Style "new" 7) `shouldBe` (Product "new" "var" 7.0 2)
+  context "lens" $ do
+    let styleL = lens iProductToStyle  iProduct'StyleToProduct
+    it "gets" $ do
+      Product "style" "var" 15.5 2 ^. styleL `shouldBe` (Style "style" 15.50)
+    it "sets" $ do
+      ((Product "style" "var" 15.0 2) & (styleL .~ (Style "new" 7)))
+        `shouldBe` (Product "new" "var" 7.0 2)
+   
 
 -- * Record parametrized by a functor.
 data Record = Record { code :: String, price :: Double} deriving (Read, Show, Eq, Ord)
