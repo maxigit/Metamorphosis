@@ -39,7 +39,7 @@ to
 
 to
 #+BEGIN_SRC haskell
-   data ProductF f = ProductF { name :: String, price :: (Maybe Double) }
+   data ProductM = ProductM { name :: String, price :: (Maybe Double) }
 #+END_SRC
 
 
