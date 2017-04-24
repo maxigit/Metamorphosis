@@ -9,6 +9,7 @@ module Metamorphosis.Internal
 , bestConstructorFor
 , typeSources
 , converterBaseName
+, filterSourceByTypes
 )
 where
 
@@ -21,7 +22,7 @@ import Data.Map(Map)
 import Data.Set(Set)
 import qualified Data.Set as Set
 import Metamorphosis.Util
-
+  
 -- | Structure Field Descriptions to types
 fieldsToTypes :: [FieldDesc] -> [TypeDesc]
 fieldsToTypes fds = let
@@ -112,7 +113,7 @@ typeSources tds = let
 filterSourceByTypes :: [TypeDesc] -> [TypeDesc] -> [TypeDesc]
 filterSourceByTypes  typesToKeep types =
   each . tdCons . each . cdFields . each . fpSources %~ (filter keep) $ types
-  where keep  fd = fd ^. fpCons . cdTypeDesc `elem` types
+  where keep  fd = fd ^. fpCons . cdTypeDesc `elem` typesToKeep
 
 filterByTypes :: [TypeDesc] -> [TypeDesc] -> [TypeDesc]
 filterByTypes typesToKeep types = filter (`elem` typesToKeep) types
@@ -165,9 +166,6 @@ bestConstructorFor typs sConss  = let
 -- ex: (A) -> (B,C) -> (A,B,C) => AB'CToABC
 converterBaseName  :: [[String]] -> [String] -> String
 converterBaseName sourcess targets = let
-  ss = map (intercalate "''") sourcess
-  t = concat targets
-  in (concat ss) ++ "To" ++ t
-
-
-
+  ss = map (intercalate "_") sourcess -- tuple separtor
+  t = intercalate "'" targets
+  in (intercalate "'" ss) ++ "To" ++ t

@@ -15,9 +15,8 @@ import Metamorphosis.Types
 import Metamorphosis.Internal
 import Language.Haskell.TH
 import Data.Maybe
-import Data.List(subsequences)
+import Data.List(subsequences, (\\))
 import Lens.Micro
-import Debug.Trace
 
 metamorphosis :: (FieldDesc -> [FieldDesc])
               -> [Name]
@@ -39,6 +38,12 @@ metamorphosis f sources rulesF deriv = do
   return $ typeDecls ++ converters ++ converters' ++ copiers ++ copiers'
 
 
+inspectTypes  :: [TypeDesc] -> Q ()
+inspectTypes typs = do
+  let fields = typs ^. each . tdCons . each . cdFields
+      display fd = (fd ^. fpField . fdFieldName, fd ^. fpSources . each . fpCons .  cdName )
+  return ()
+
 -- | Generates all possible converter between different classes
 -- We generate all possible combinations and filter the name 
 genConverters :: (String -> Maybe BodyConsRules)
@@ -51,16 +56,22 @@ genConverters rulesF targets' = do
         _ -> fp
       unnest :: [[TypeDesc]] -> [[TypeDesc]]
       unnest ts = map return (concat ts)
-      targets = targets' & mapped . tdCons . mapped . cdFields . mapped  %~ autoSource
+      targets = targets' -- & mapped . tdCons . mapped . cdFields . mapped  %~ autoSource
 
-      subsequences' = (Prelude.filter (not  . null)) . subsequences
+      subsequences1 = (Prelude.filter (not  . null)) . subsequences
       combinations = 
-        [ (rules, name, srcs, tgts)
-        | tgts <- subsequences' targets
+        -- @TODO Rewrite
+        [ (rules, name, srcs, tgts1)
+        | tgts <- subsequences1 targets
         , let sources = typeSources tgts
-        , srcs' <- subsequences' sources
-        , let srcs = [ [s] | s <- srcs'] :: [[TypeDesc]]
-        , let name = traceShowId $ converterBaseName (map (map _tdName) srcs) (tgts ^.. each . tdName)
+        , srcs' <- subsequences1 sources
+        -- Remove the sources which are not relevant anymore
+        , let tgts1 = (filterSourceByTypes srcs' tgts) &
+                    mapped . tdCons . mapped . cdFields . mapped %~ autoSource
+        , let setterTypes = typeSources tgts1 & (filter (`notElem` srcs'))
+        , extra <- subsequences setterTypes
+        , let srcs = [ [s] | s <- extra ++ srcs'] :: [[TypeDesc]]
+        , let name = converterBaseName (map (map _tdName) srcs) (tgts1 ^.. each . tdName)
         , rules <- maybeToList $ rulesF name
         ]
   mapM (\(rules, name, srcs, tgts) -> genConversion name rules (unnest srcs) tgts) combinations
@@ -69,5 +80,7 @@ genConverters rulesF targets' = do
 -- Useful for parametric types, to convert between same type
 -- but changing the type parameter
 
-genCopiers rulesF targets' =  genConverters rulesF targets where
-  targets = targets' & mapped . tdCons. mapped. cdFields . mapped . fpSources .~ []
+genCopiers rulesF targets' = concat `fmap` mapM go targets 
+  where go target = genConverters rulesF [target]
+        targets = targets' & mapped . tdCons. mapped. cdFields . mapped %~ auto
+        auto fp = fp & fpSources .~ [fp & fpSources .~ []]

@@ -59,7 +59,10 @@ _fdType = liftA2 (,) _fdModuleName _fdTypeName
 data TypeDesc = TypeDesc { _tdName :: TypeName
                          , _tdModuleName :: Maybe ModuleName
                          , _tdCons :: [ConsDesc]
-                         } deriving (Show, Eq, Ord)
+                         } deriving (Show) -- Eq, Ord)
+typeDescToTuple = (,) <$> _tdName <*> _tdModuleName
+instance Eq TypeDesc where a == b = typeDescToTuple a == typeDescToTuple b
+instance Ord TypeDesc where compare a b = compare (typeDescToTuple a) (typeDescToTuple b)
 
 _tdFields typD = concatMap (_cdFields) (_tdCons typD)
 tdFields = to _tdFields

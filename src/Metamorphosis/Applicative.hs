@@ -23,8 +23,12 @@ instance Applicative f => ConvertA a Identity (f a) where
   convertA = pure . pure
 instance ConvertA () Maybe a where
   convertA () = Nothing
-instance Monoid a => ConvertA () Identity a where
-  convertA () = Identity mempty
+instance ConvertA () Identity (Maybe a) where
+  convertA () = Identity (Nothing)
+-- instance Monoid a => ConvertA () Identity a where
+  -- convertA () = Identity mempty
+instance ConvertA () Identity [a] where
+  convertA () = Identity []
 instance ConvertA (Maybe a) Identity [a] where
   convertA Nothing = Identity []
   convertA (Just x) = Identity [x]
