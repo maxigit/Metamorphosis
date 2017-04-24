@@ -92,7 +92,7 @@ One solution would be to have, name being a =First String= instead of =String=, 
 or even maybe just ignore it and use =Const () String=. The traditional answer to this is, just define
 
 #+BEGIN_SRC haskell
-     data Product f = Product { f name :: String, amount :: Double} 
+     data Product f = Product { name :: f String, amount :: Double} 
 #+END_SRC
 
 and then I can define a monoid instance for =Monoid (f String) => Monoid (Product f)=.
@@ -109,9 +109,11 @@ Generics, can probably take care of the converter but it can't generate the new 
 * The applicative conversion context
 In order to have the generator the less smart as possible, every conversion are done within an applicative context.
 We use the =ConvertA a f b= type class which basically means that =a= can be converted into =b= in a =f= context.
-=f= is usually either =Identity= (we know the conversion always success), =Maybe= (conversion can fail),=[]= or even =ZipList=.
+The main purpose of =ConvertA= is to lift normal value to applicative using =pure= if necessary but also convert between different functor
+when possible.
+=f= is usually either =Identity= (we know the conversion always success), =Maybe= (conversion can fail), =[]= or even =ZipList=.
 
-This allow every converters to be written with the following shapes and compiles even if types mismatch. For example, given
+This allows every converters to be written with the following shapes and compiles even if types mismatch. For example, given
 
 #+BEGIN_SRC haskell
      data A a = A  a
@@ -122,7 +124,7 @@ The converter will be
 
 
 #+BEGIN_SRC haskell
-    aAtoB (A a) =  A <$> convertA a <*> convertA ()
+    aAtoB (A a) =  B <$> convertA a <*> convertA ()
 #+END_SRC
 
 =()= will be converted to =Nothing= (needed for =Maybe Int=) and depending and =a= and =b=, we could convert between =A= and =B= or not.
