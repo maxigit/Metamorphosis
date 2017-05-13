@@ -4,6 +4,7 @@
 {-# LANGUAGE TupleSections #-}
 module Metamorphosis
 ( metamorphosis
+, mmZip
 , identityBCR
 , applicativeBCR
 , monoidBCR
@@ -86,3 +87,9 @@ genCopiers rulesF targets' = concat `fmap` mapM go targets
   where go target = genConverters rulesF [target]
         targets = targets' & mapped . tdCons. mapped. cdFields . mapped %~ auto
         auto fp = fp & fpSources .~ [fp & fpSources .~ []]
+
+mmZip :: String -> Name -> Q [Dec]
+mmZip fname typeName = do
+  [td] <- collectTypes [typeName]
+  (:[]) <$> genZip (fname ++ (nameBase typeName)) fname td
+

@@ -135,6 +135,11 @@ spec = do
       generateType [] point `shouldLook`
         "data Point a = Point {x :: a, y :: a}" 
 
+  describe "genZip" $ do
+    it "generate a zip between the fields of two identical data" $ do
+      genZip "zipPoint" "f" point `shouldLookQ`
+        "zipPoint (Point x_0 y_1) (Point x_2 y_3) = (Point (f x_0 x_2) (f y_1 y_3))"
+
        
 
 

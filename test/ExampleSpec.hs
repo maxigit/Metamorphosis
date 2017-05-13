@@ -252,6 +252,11 @@ monoidSpecs = describe "To Monoid" $ do
   it "" (pendingWith ("rewrite API"))
 
 
+$(mmZip "min" ''Product)
+zipSpecs = describe "generates zip fields function" $ do
+  it "zips plain records" $ do
+    minProduct (Product "A1" "Z" 45 2 ) (Product "V" "B2" 2 10) `shouldBe` Product "A1" "B2" 2 2
+    
 
     
   
@@ -262,6 +267,7 @@ spec = do
   toSumSpecs
   toEnumSpecs
   monoidSpecs
+  zipSpecs
 
 
  
