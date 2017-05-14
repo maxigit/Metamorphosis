@@ -88,8 +88,8 @@ genCopiers rulesF targets' = concat `fmap` mapM go targets
         targets = targets' & mapped . tdCons. mapped. cdFields . mapped %~ auto
         auto fp = fp & fpSources .~ [fp & fpSources .~ []]
 
-mmZip :: String -> Name -> Q [Dec]
-mmZip fname typeName = do
+mmZip :: String -> Name -> Maybe Name -> Q [Dec]
+mmZip fname typeName consName = do
   [td] <- collectTypes [typeName]
-  (:[]) <$> genZip (fname ++ (nameBase typeName)) fname td
+  (:[]) <$> genZip (fname ++ (nameBase typeName)) fname td consName
 

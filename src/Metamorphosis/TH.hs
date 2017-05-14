@@ -147,8 +147,8 @@ genConversion baseName rules sourcess targets = do
 
 -- ** Generates zip
 -- | Generate a Zip between all field of a  type
-genZip :: String -> String -> TypeDesc -> Q Dec
-genZip baseName fnName source = let
+genZip :: String -> String -> TypeDesc -> Maybe Name -> Q Dec
+genZip baseName fnName source consNameM = let
   -- to reuse the conversion code
   -- we simulate a mapping between to identical sources
   -- pointing to the same value
@@ -157,7 +157,7 @@ genZip baseName fnName source = let
   target = source & tdCons . each . cdFields . each %~ doubleSource
   doubleSource fp = fp & fpSources .~ [fp, fp & fpField . fdTypeName %~ to']
   appFn fs = foldl AppE (VarE $ mkName fnName) fs
-  rules = BodyConsRules id appFn (repeat AppE) (id)
+  rules = BodyConsRules (maybe id (const . ConE) consNameM) appFn (repeat AppE) (id)
   in genConversion baseName rules [[source], [source']] [target]
   
 -- ** Default body constructor rules
