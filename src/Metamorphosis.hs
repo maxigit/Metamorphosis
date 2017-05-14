@@ -5,6 +5,7 @@
 module Metamorphosis
 ( metamorphosis
 , mmZip
+, mmZipN
 , identityBCR
 , applicativeBCR
 , monoidBCR
@@ -88,8 +89,12 @@ genCopiers rulesF targets' = concat `fmap` mapM go targets
         targets = targets' & mapped . tdCons. mapped. cdFields . mapped %~ auto
         auto fp = fp & fpSources .~ [fp & fpSources .~ []]
 
-mmZip :: String -> Name -> Maybe Name -> Q [Dec]
-mmZip fname typeName consName = do
-  [td] <- collectTypes [typeName]
-  (:[]) <$> genZip (fname ++ (nameBase typeName)) fname td consName
+mmZip :: String -> Name -> Q [Dec]
+mmZip fname typeName = mmZipN 2 fname typeName Nothing
 
+mmZipN :: Int ->  String -> Name -> Maybe Name -> Q [Dec]
+mmZipN n fname typeName consName = do
+  let suffix 2 = ""
+      suffix n = show n
+  [td] <- collectTypes [typeName]
+  (:[]) <$> genZip n (fname ++ (nameBase typeName) ++ suffix n) fname td consName

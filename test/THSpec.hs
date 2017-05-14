@@ -137,11 +137,15 @@ spec = do
 
   describe "genZip" $ do
     it "generate a zip between the fields of two identical data" $ do
-      genZip "zipPoint" "f" point Nothing `shouldLookQ`
+      genZip 2 "zipPoint" "f" point Nothing `shouldLookQ`
         "zipPoint (Point x_0 y_1) (Point x_2 y_3) = (Point (f x_0 x_2) (f y_1 y_3))"
     it "generate a zip with given constructor " $ do
-      genZip "zipPoint" "f" point (Just ''A) `shouldLookQ`
+      genZip 2 "zipPoint" "f" point (Just ''A) `shouldLookQ`
         "zipPoint (Point x_0 y_1) (Point x_2 y_3) = (THSpec.A (f x_0 x_2) (f y_1 y_3))"
+    it "generate a zip between the fields of n identical data" $ do
+      genZip 3 "zipPoint" "f" point Nothing `shouldLookQ`
+        "zipPoint (Point x_0 y_1) (Point x_2 y_3) (Point x_4 y_5)\
+        \ = (Point (f x_0 x_2 x_4) (f y_1 y_3 y_5))"
 
        
 

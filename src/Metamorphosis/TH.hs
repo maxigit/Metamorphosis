@@ -147,18 +147,18 @@ genConversion baseName rules sourcess targets = do
 
 -- ** Generates zip
 -- | Generate a Zip between all field of a  type
-genZip :: String -> String -> TypeDesc -> Maybe Name -> Q Dec
-genZip baseName fnName source consNameM = let
+genZip :: Int ->  String -> String -> TypeDesc -> Maybe Name -> Q Dec
+genZip n baseName fnName source consNameM = let
   -- to reuse the conversion code
   -- we simulate a mapping between to identical sources
   -- pointing to the same value
-  to' = (++"'")
-  source' = source & tdCons . each . cdFields . each . fpField . fdTypeName  %~ to'
+  to' n = (++ show n)
+  sources' = map (\i -> source & tdCons . each . cdFields . each . fpField . fdTypeName  %~ to' i) [2..n]
   target = source & tdCons . each . cdFields . each %~ doubleSource
-  doubleSource fp = fp & fpSources .~ [fp, fp & fpField . fdTypeName %~ to']
+  doubleSource fp = fp & fpSources .~ fp:[fp & fpField . fdTypeName %~ to' i | i <- [2..n]]
   appFn fs = foldl AppE (VarE $ mkName fnName) fs
   rules = BodyConsRules (maybe id (const . ConE) consNameM) appFn (repeat AppE) (id)
-  in genConversion baseName rules [[source], [source']] [target]
+  in genConversion baseName rules ([source]: map return  sources') [target]
   
 -- ** Default body constructor rules
 fieldsToTuples :: [Exp] -> Exp
