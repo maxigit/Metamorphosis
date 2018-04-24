@@ -1,6 +1,8 @@
--- This file has been generated from package.yaml by hpack version 0.14.0.
+-- This file has been generated from package.yaml by hpack version 0.20.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: 97a3ca3ff6f1b5cd41afe336686abedc7faf0711f70a1b9e9812984edaabed67
 
 name:           Metamorphosis
 version:        0.1.0.1
@@ -20,10 +22,10 @@ library
       src
   build-depends:
       base >=4.8 && <5.0
-    , template-haskell
-    , containers >= 0.5 && < 0.6
+    , containers >=0.5 && <0.6
     , microlens
     , microlens-th
+    , template-haskell
   exposed-modules:
       Metamorphosis
       Metamorphosis.Applicative
@@ -32,6 +34,8 @@ library
       Metamorphosis.Types
       Metamorphosis.Util
       Sandbox
+  other-modules:
+      Paths_Metamorphosis
   default-language: Haskell2010
 
 test-suite spec
@@ -40,18 +44,19 @@ test-suite spec
   hs-source-dirs:
       test
   build-depends:
-      base >=4.8 && <5.0
-    , template-haskell
-    , containers >= 0.5 && < 0.6
+      Metamorphosis
+    , base >=4.8 && <5.0
+    , containers >=0.5 && <0.6
+    , doctest
+    , hspec >=2.1.8
+    , lens
     , microlens
     , microlens-th
-    , Metamorphosis
-    , hspec >= 2.1.8
-    , doctest
-    , lens
+    , template-haskell
   other-modules:
       ExampleSpec
       InternalSpec
       PointSpec
       THSpec
+      Paths_Metamorphosis
   default-language: Haskell2010

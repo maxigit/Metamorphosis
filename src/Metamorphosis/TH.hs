@@ -1,4 +1,4 @@
-{-# LANGUAGE QuasiQuotes, TemplateHaskell #-}
+{-# LANGUAGE QuasiQuotes, TemplateHaskell, CPP #-}
 module Metamorphosis.TH where
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
@@ -123,7 +123,7 @@ genName fp = newName $ case (fp ^. fpField . fdFieldName) of
     Nothing -> uncapitalize $ fp ^. fpCons . cdName ++ show (fp ^. fpField . fdPos)
     Just name -> name
 
- -- | Generates a call to a constructor
+-- | Generates a call to a constructor
 -- ex: (consF A <op> fieldF a <op> fieldF b)
 genConsBodyE :: BodyConsRules -> Map FieldDescPlus Name -> ConsDesc -> Exp
 genConsBodyE (BodyConsRules consF fieldsF opFs _) fieldToName consDesc = let
@@ -193,15 +193,19 @@ monoidPureBCR f = BodyConsRules (const (VarE $ mkName "mempty"))
 
                 
 
-
 -- * Generating Types
+#if __GLASGOW_HASKELL__ <= 801
+derivCls cls = cls
+#else
+derivCls cls = [DerivClause Nothing cls]
+#endif
 -- | Generates a Type declaration from its Type Description
 generateType :: [Name] -> TypeDesc -> Dec
 generateType derivs typ = let
   cons =  typ ^. tdCons
   fields = typ ^.. tdCons . each . cdFields  . each . fpField
   varTypes = nub $ sort (concatMap _fdVarTypes fields)
-  in DataD [] (mkName $ typ ^. tdName) varTypes Nothing (map generateCons cons) (map ConT derivs)
+  in DataD [] (mkName $ typ ^. tdName) varTypes Nothing (map generateCons cons) (derivCls $ map (ConT) derivs)
 
 -- | Generates a Constructor declaration
 generateCons :: ConsDesc -> Con
