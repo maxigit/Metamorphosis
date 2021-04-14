@@ -93,6 +93,10 @@ consToPat fieldToName consDesc = let
 -- | Generates a tuple patter from a list of constructors
 -- ex: [(A Int), (B String)] -> (A a, B b)
 conssToTuplePat :: (Map FieldDescPlus Name) -> [ConsDesc] -> Pat
+#if __GLASGOW_HASKELL__ >= 810
+conssToTuplePat fieldToName [consDesc] = let
+  in  consToPat fieldToName consDesc
+#endif /* ! __GLASGOW_HASKELL__ >= 810 */
 conssToTuplePat fieldToName consDescs = let
   in TupP (map (consToPat fieldToName) consDescs )
 
@@ -105,7 +109,13 @@ genConsClause rules sources targets = do
   let used = targets ^. each . cdFields . each  . fpSources
   let fieldToName0 = Map.filterWithKey (\f n -> f `elem` used) fieldToName
       pats = map (conssToTuplePat fieldToName0) sources
+#if __GLASGOW_HASKELL__ >= 810
+      body = case targets of
+            [target] -> genConsBodyE rules fieldToName target
+            _ -> TupE (map (Just . genConsBodyE rules fieldToName) targets)
+#else /* __GLASGOW_HASKELL__ >= 810 */
       body = TupE (map (genConsBodyE rules fieldToName) targets)
+#endif /* __GLASGOW_HASKELL__ >= 810 */
   return $  Clause pats (NormalB body) []
 
 

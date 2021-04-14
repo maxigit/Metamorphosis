@@ -1,8 +1,10 @@
--- This file has been generated from package.yaml by hpack version 0.20.0.
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 97a3ca3ff6f1b5cd41afe336686abedc7faf0711f70a1b9e9812984edaabed67
+-- hash: ce095faded9424f36a88db16eb7d6d12eb8e40819af9edfa95f55be540dcfd11
 
 name:           Metamorphosis
 version:        0.1.0.1
@@ -12,8 +14,6 @@ maintainer:     bmx007@gmail.com
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
-cabal-version:  >= 1.10
-
 extra-source-files:
     ChangeLog.md
 
@@ -22,7 +22,7 @@ library
       src
   build-depends:
       base >=4.8 && <5.0
-    , containers >=0.5 && <0.6
+    , containers ==0.5.*
     , microlens
     , microlens-th
     , template-haskell
@@ -46,7 +46,7 @@ test-suite spec
   build-depends:
       Metamorphosis
     , base >=4.8 && <5.0
-    , containers >=0.5 && <0.6
+    , containers ==0.5.*
     , doctest
     , hspec >=2.1.8
     , lens
