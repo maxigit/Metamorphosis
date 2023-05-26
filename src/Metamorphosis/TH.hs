@@ -85,7 +85,7 @@ consToPat :: (Map FieldDescPlus Name) -> ConsDesc -> Pat
 consToPat fieldToName consDesc = let
   pats = map  fieldName (consDesc ^. cdFields)
   fieldName field = maybe WildP VarP (Map.lookup field fieldToName)
-  in ConP (mkName $ consDesc ^. cdName) pats
+  in ConP (mkName $ consDesc ^. cdName) [] pats
 
   
   
@@ -246,10 +246,10 @@ _fdTyp field = typeNamesToType (_fdTypes field)
  
 -- | Extract parametric variables from a field
 -- example "f Int" -> ["f"]
-_fdVarTypes :: FieldDesc -> [TyVarBndr]
+_fdVarTypes :: FieldDesc -> [TyVarBndr ()]
 _fdVarTypes field = let
   vars = filter (isVar) (_fdTypes field)
-  in map (PlainTV . mkName) vars
+  in map (flip PlainTV () . mkName) vars
 
 
 

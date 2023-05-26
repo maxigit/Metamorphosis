@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ce095faded9424f36a88db16eb7d6d12eb8e40819af9edfa95f55be540dcfd11
+-- hash: 584429012f8bc1f1c9bb533c5374dd0c824cf0622eaa2ebbb3f30dfb8e99455e
 
 name:           Metamorphosis
 version:        0.1.0.1
@@ -25,7 +25,7 @@ library
     , containers ==0.5.*
     , microlens
     , microlens-th
-    , template-haskell
+    , template-haskell >=2.18.0.0 && <3.0
   exposed-modules:
       Metamorphosis
       Metamorphosis.Applicative
@@ -52,7 +52,7 @@ test-suite spec
     , lens
     , microlens
     , microlens-th
-    , template-haskell
+    , template-haskell >=2.18.0.0 && <3.0
   other-modules:
       ExampleSpec
       InternalSpec
