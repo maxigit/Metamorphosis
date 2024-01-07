@@ -23,7 +23,7 @@ aInfo = TyConI (DataD []
                                                 , ((mkName "price"),Bang NoSourceUnpackedness NoSourceStrictness,ConT (mkName "Double"))
                                                 ]
                        ]
-               [ConT (mkName "Show")]
+               [DerivClause Nothing [ConT (mkName "Show")]]
                )
 data Point a = Point { x :: a, y :: a } deriving Show
 pointInfo = TyConI (DataD []
@@ -33,7 +33,7 @@ pointInfo = TyConI (DataD []
                                                    , ((mkName "y"),Bang NoSourceUnpackedness NoSourceStrictness,ConT (mkName "a"))
                                                    ]
                            ]
-                   [ConT (mkName "Show")]
+                   [DerivClause Nothing [ConT (mkName "Show")]]
                    )
 
 shouldLook expr expected = sanitize (show $ ppr expr) `shouldBe` sanitize expected
