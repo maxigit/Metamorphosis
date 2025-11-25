@@ -129,11 +129,11 @@ spec = do
   describe "generateType" $ do
     it "generates complex type" $ do
       generateType [''Show] a `shouldLook`
-        "data A = A Int String | Record {style :: String, price :: Double} deriving GHC.Show.Show"
+        "data A = A Int String | Record {style :: String, price :: Double} deriving GHC.Internal.Show.Show"
 
     it "generates parametric type" $ do
       generateType [] point `shouldLook`
-        "data Point a = Point {x :: a, y :: a} deriving" 
+        "data Point a = Point {x :: a, y :: a} deriving ()" 
 
   describe "genZip" $ do
     it "generate a zip between the fields of two identical data" $ do

@@ -246,10 +246,10 @@ _fdTyp field = typeNamesToType (_fdTypes field)
  
 -- | Extract parametric variables from a field
 -- example "f Int" -> ["f"]
-_fdVarTypes :: FieldDesc -> [TyVarBndr ()]
+_fdVarTypes :: FieldDesc -> [TyVarBndr BndrVis]
 _fdVarTypes field = let
   vars = filter (isVar) (_fdTypes field)
-  in map (flip PlainTV () . mkName) vars
+  in map (flip PlainTV BndrReq . mkName) vars
 
 
 

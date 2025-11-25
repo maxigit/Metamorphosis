@@ -15,7 +15,7 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-20.11
+resolver: lts-24.21
   #resolver: lts-17.9
 
 # User packages to be built.
@@ -67,3 +67,6 @@ extra-package-dbs: []
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
 allow-newer: true
+
+nix:
+  pure: true
